@@ -28,7 +28,10 @@
             }
 
             #images {
-                height: 300px;
+                position: absolute;
+                top: 10px; right: 10px;
+                width: 400px;
+                height: 600px;
                 overflow: auto;
             }
 
@@ -39,15 +42,19 @@
     </head>
 
     <body>
+        <h1>Creation</h1>
         <div id="creation">
-            <label><span>project id</span><input name="project" readonly="readonly"/></label>
+            <label><span>project id</span><input name="project"/></label>
             <label><span>compute name</span><input name="name" /></label>
-            <label><span>zone</span><input name="zone" value="asia-east1-a" /></label>
+            <label><span>zone</span><input name="zone" /></label>
             <label><span>machine type</span><input name="machine_type" value="f1-micro" /></label>
             <label><span>image</span><input name="image" /></label>
             <label><span></span><button id="btn-create">建立</button></label>
         </div>
+        
+        <h1>Instances</h1>
         <div id="instances"> <!-- list instances --> </div>
+        
         <div id="images"> <!-- list debian images --> </div>
 
     <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
@@ -71,8 +78,30 @@
             <div class="image"></div>        
         `);
 
+    function insert(item) {
+            var $item = $tmpInstance.clone();
+            $item.data('item', item);
+            $item.find('h3').text(item.name);
+            $item.find('.status > span').text(item.status);
+
+            $instances.append($item)
+            displayIP($item, item)
+            return $item;
+    }
+
+    function displayIP($item, item) {
+        var ipList = [];
+        for (var i = 0, iLen = item.networkInterfaces.length; i < iLen; i++) {
+            for (var j = 0, jLen = item.networkInterfaces[i].accessConfigs.length; j < jLen; j++) {
+                ipList.push(item.networkInterfaces[i].accessConfigs[j].natIP);
+            }
+        }
+        $item.find('.ip > span').text(ipList.join(','))
+    }
+
     // creation
-    $creation.find('[name=project]').val(project);
+    $creation.find('[name=project]').val(project).attr('readonly');
+    $creation.find('[name=zone]').val(zone).attr('readonly');
     $btnCreate.on('click', function(e){
         var o = {
             project: $creation.find('[name=project]').val(),
@@ -80,11 +109,30 @@
             zone: $creation.find('[name=zone]').val(),
             machine_type: $creation.find('[name=machine_type]').val(),
             image: $creation.find('[name=image]').val()
-        };
+        },
+        $this;
+
+        function reload() {
+            $.get(`/admin/api/compute/instance?project=${project}&zone=${zone}&name=${o.name}`, function(json, statusText, xhr){
+                if (json) {
+                    if (!$this) {
+                        $this = insert(json);
+                    } else {
+                        $this.find('.status > span').text(json.status)
+                    }
+
+                    if (json.status == "RUNNING") {
+                        displayIP($this, json)
+                        return
+                    }
+                }
+                setTimeout(reload, 1000)
+            })
+        }
 
         $btnCreate.attr('disabled', 'disabled');
         $.post(`/admin/api/compute/instances/insert`, o, function(op, statusText, xhr){
-            console.log(op)
+            reload();
         }).always(function(){
             $btnCreate.removeAttr('disabled');
         });
@@ -123,20 +171,7 @@
     // fetch all instances
     $.get(`/admin/api/compute/instances?project=${project}&zone=${zone}`, function(json, stateText, xhr){
         $.each(json.items, function(_, item){
-            var $item = $tmpInstance.clone(),
-                ipList = [];
-            $item.data('item', item);
-            $item.find('h3').text(item.name);
-            $item.find('.status > span').text(item.status);
-
-            for (var i = 0, iLen = item.networkInterfaces.length; i < iLen; i++) {
-                for (var j = 0, jLen = item.networkInterfaces[i].accessConfigs.length; j < jLen; j++) {
-                    ipList.push(item.networkInterfaces[i].accessConfigs[j].natIP);
-                }
-            }
-            $item.find('.ip > span').text(ipList.join(','))
-            $instances.append($item)
-
+            insert(item)
         }, "json")
     });
 

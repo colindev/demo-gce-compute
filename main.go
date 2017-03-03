@@ -53,8 +53,10 @@ func main() {
 	SetComputeService(service)
 
 	http.Handle("/", http.FileServer(http.Dir("./views")))
+	http.HandleFunc("/admin/api/compute/zones", listZones)
 	http.HandleFunc("/admin/api/compute/images", listDebianImages)
 	http.HandleFunc("/admin/api/compute/instances", listComputeInstances)
+	http.HandleFunc("/admin/api/compute/instance", getComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/insert", insertComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/delete", deleteConputeInstance)
 	log.Println(http.ListenAndServe(addr, nil))
@@ -71,6 +73,25 @@ func writeRes(w http.ResponseWriter, v interface{}) {
 	w.Write(b)
 }
 
+func listZones(w http.ResponseWriter, r *http.Request) {
+
+	service, exists := GetComputeService()
+	if !exists {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	project := r.FormValue("project")
+
+	res, err := service.Zones.List(project).Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, res)
+}
+
 func listDebianImages(w http.ResponseWriter, r *http.Request) {
 
 	service, exists := GetComputeService()
@@ -80,6 +101,27 @@ func listDebianImages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := service.Images.List("debian-cloud").Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, res)
+}
+
+func getComputeInstance(w http.ResponseWriter, r *http.Request) {
+
+	service, exists := GetComputeService()
+	if !exists {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	project := r.FormValue("project")
+	zone := r.FormValue("zone")
+	name := r.FormValue("name")
+
+	res, err := service.Instances.Get(project, zone, name).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -125,6 +167,7 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", project, "default")
 
 	startupScript, err := ioutil.ReadFile("./scripts/install-wp-lamp.sh")
+	// startupScript, err := ioutil.ReadFile("./scripts/debug.sh")
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return

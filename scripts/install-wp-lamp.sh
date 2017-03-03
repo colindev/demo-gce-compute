@@ -129,7 +129,7 @@ WP_DBUSER=wp
 WP_DBPASS=456
 
 apt-get update
-apt-get install -y apache2 php5 php5-mysql php5-mysqli php5-mysqlnd php5-curl php5-gd
+apt-get install -y apache2 php5 php5-mysql php5-curl php5-gd
 
 systemctl restart apache2
 
@@ -143,11 +143,11 @@ apt-get install -y mysql-client mysql-server
 chown -R www-data:www-data /var/www/html/
 cd /var/www/html/
 
-create_new_db
-install_wp
-generate_htaccess
-generate_robots
-download_plugins
+create_new_db >> /tmp/debug
+install_wp >> /tmp/debug
+generate_htaccess >> /tmp/debug
+generate_robots >> /tmp/debug
+download_plugins >> /tmp/debug
 
 
 
