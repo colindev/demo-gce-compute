@@ -56,6 +56,7 @@ func main() {
 	http.HandleFunc("/admin/api/compute/images", listDebianImages)
 	http.HandleFunc("/admin/api/compute/instances", listComputeInstances)
 	http.HandleFunc("/admin/api/compute/instances/insert", insertComputeInstance)
+	http.HandleFunc("/admin/api/compute/instances/delete", deleteConputeInstance)
 	log.Println(http.ListenAndServe(addr, nil))
 }
 
@@ -140,7 +141,7 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 				Boot:       true,
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					DiskName:    "demo",
+					DiskName:    "disk-" + name,
 					SourceImage: imageURL,
 				},
 			},
@@ -170,6 +171,27 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	op, err := service.Instances.Insert(project, zone, instance).Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, op)
+}
+
+func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
+
+	service, exists := GetComputeService()
+	if !exists {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	project := r.FormValue("project")
+	zone := r.FormValue("zone")
+	name := r.FormValue("name")
+
+	op, err := service.Instances.Delete(project, zone, name).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
