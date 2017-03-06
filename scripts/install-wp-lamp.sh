@@ -132,7 +132,6 @@ WP_DBNAME=wp_db
 WP_DBUSER=wp
 WP_DBPASS=456
 broadcast=http://10.140.0.2/ws-broadcast
-# status_page=/var/www/html/status.html
 
 # 1
 post_process $broadcast '{"hostname":"${HOSTNAME}","active":"apt-get update"}'
