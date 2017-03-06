@@ -79,6 +79,9 @@
         `),
         ws = new WebSocket(`ws://${location.host}/ws`);
 
+    $(document).ajaxError(function(e, xhr, sets, err){
+        alert(xhr.responseText)
+    });
     ws.onmessage = function(e){
         var status = JSON.parse(e.data);
         $instances.find(`[ref=${status.hostname}] .status > span`).text(status.active);
