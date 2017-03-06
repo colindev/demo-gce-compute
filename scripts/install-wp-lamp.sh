@@ -134,12 +134,12 @@ WP_DBPASS=456
 broadcast=http://10.140.0.2/ws-broadcast
 
 # 1
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"apt-get update"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"apt-get update"}'
 
 apt-get update
 
 # 2
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"install apache php"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"install apache php"}'
 
 apt-get install -y apache2 php5 php5-mysql php5-curl php5-gd
 
@@ -152,35 +152,35 @@ debconf-set-selections <<< "mysql-server mysql-server/root_password password ${M
 debconf-set-selections <<< "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWD}"
 
 # 3
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"install mysql"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"install mysql"}'
 
 apt-get install -y mysql-client mysql-server
 
 # 4
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"setup html dir"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"setup html dir"}'
 
 chown -R www-data:www-data /var/www/html/
 cd /var/www/html/
 
 # 5
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"create database"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"create database"}'
 create_new_db >> /tmp/debug
 
 # 6
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"install WordPress"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"install WordPress"}'
 install_wp >> /tmp/debug
 
 # 7
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"generate .htaccess"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"generate .htaccess"}'
 generate_htaccess >> /tmp/debug
 
 generate_robots >> /tmp/debug
 
 # 8
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"download WordPress plugins"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"download WordPress plugins"}'
 download_plugins >> /tmp/debug
 
 # 9
-post_process $broadcast '{"hostname":"${HOSTNAME}","active":"all done"}'
+post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"all done"}'
 
 
