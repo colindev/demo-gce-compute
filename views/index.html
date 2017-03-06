@@ -69,7 +69,8 @@
                 <h3></h3> <button class="btn-delete">delete</button>
                 <ul class="inner">
                     <li class="status">Status<span></span></li>
-                    <li class="ip">IP<span></span></li>
+                    <li class="ip">Nat IP<span></span></li>
+                    <li class="network_ip">network IP<span></span></li>
                 </ul>
             </div>
         `),
@@ -100,13 +101,16 @@
     }
 
     function displayIP($item, item) {
-        var ipList = [];
+        var networkIPList = [],
+            ipList = [];
         for (var i = 0, iLen = item.networkInterfaces.length; i < iLen; i++) {
             for (var j = 0, jLen = item.networkInterfaces[i].accessConfigs.length; j < jLen; j++) {
                 ipList.push(item.networkInterfaces[i].accessConfigs[j].natIP);
             }
+            networkIPList.push(item.networkInterfaces[i].networkIP);
         }
         $item.find('.ip > span').text(ipList.join(','))
+        $item.find('.network_ip > span').text(networkIPList.join(','))
         return ipList.pop();
     }
 
