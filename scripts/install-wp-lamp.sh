@@ -131,7 +131,7 @@ MYSQL_ROOT_PASSWD=123
 WP_DBNAME=wp_db
 WP_DBUSER=wp
 WP_DBPASS=456
-broadcast=http://104.199.139.119/ws-broadcast
+broadcast=http://10.140.0.2/ws-broadcast
 # status_page=/var/www/html/status.html
 
 # 1
