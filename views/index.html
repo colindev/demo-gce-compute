@@ -76,10 +76,17 @@
         $images = $('#images'),
         $tmpImage = $(`
             <div class="image"></div>        
-        `);
+        `),
+        ws = new WebSocket(`ws://${location.host}/ws`);
+
+    ws.onmessage = function(e){
+        var status = JSON.parse(e.data);
+        $instances.find(`[ref=${status.hostname}] .status > span`).text(status.active);
+    };
 
     function insert(item) {
             var $item = $tmpInstance.clone();
+            $item.attr("ref", item.name);
             $item.data('item', item);
             $item.find('h3').text(item.name);
             $item.find('.status > span').text(item.status);
@@ -97,6 +104,7 @@
             }
         }
         $item.find('.ip > span').text(ipList.join(','))
+        return ipList.pop();
     }
 
     // creation
@@ -122,7 +130,7 @@
                     }
 
                     if (json.status == "RUNNING") {
-                        displayIP($this, json)
+                        var ip = displayIP($this, json);
                         return
                     }
                 }

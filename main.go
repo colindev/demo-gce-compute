@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/colindev/wshub"
+
 	compute "google.golang.org/api/compute/v1"
 
 	"golang.org/x/oauth2/google"
@@ -21,7 +23,10 @@ var (
 
 type key int
 
-var computeServiceKey key
+var (
+	computeServiceKey key = 1
+	wshubKey          key = 2
+)
 
 func SetComputeService(service *compute.Service) {
 	ctx = context.WithValue(ctx, computeServiceKey, service)
@@ -29,6 +34,20 @@ func SetComputeService(service *compute.Service) {
 func GetComputeService() (*compute.Service, bool) {
 	service, ok := ctx.Value(computeServiceKey).(*compute.Service)
 	return service, ok
+}
+
+func SetWSHub(hub *wshub.Hub) {
+	ctx = context.WithValue(ctx, wshubKey, hub)
+}
+func GetWSHub() (*wshub.Hub, bool) {
+	hub, ok := ctx.Value(wshubKey).(*wshub.Hub)
+	return hub, ok
+}
+
+type ProcessStatus struct {
+	Hostname   string  `json:"hostname"`
+	Active     string  `json:"active"`
+	Percentage float64 `json:"percentage,omitempty"`
 }
 
 func init() {
@@ -52,7 +71,13 @@ func main() {
 
 	SetComputeService(service)
 
+	hub := wshub.New()
+	go hub.Run()
+	SetWSHub(hub)
+
 	http.Handle("/", http.FileServer(http.Dir("./views")))
+	http.Handle("/ws", hub)
+	http.HandleFunc("/ws-broadcast", broadcast)
 	http.HandleFunc("/admin/api/compute/zones", listZones)
 	http.HandleFunc("/admin/api/compute/images", listDebianImages)
 	http.HandleFunc("/admin/api/compute/instances", listComputeInstances)
@@ -241,4 +266,21 @@ func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeRes(w, op)
+}
+
+func broadcast(w http.ResponseWriter, r *http.Request) {
+
+	hub, exists := GetWSHub()
+	if !exists {
+		http.Error(w, "wshub not found", 500)
+		return
+	}
+
+	var status ProcessStatus
+	if err := json.NewDecoder(r.Body).Decode(&status); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	hub.Broadcast(status, nil)
 }

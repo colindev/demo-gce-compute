@@ -121,33 +121,67 @@ function download_plugins {
     cd ../..
 }
 
+function post_process {
+    curl -X POST -d "${2}" "${1}"
+}
+
 # -------------------------------
 
 MYSQL_ROOT_PASSWD=123
 WP_DBNAME=wp_db
 WP_DBUSER=wp
 WP_DBPASS=456
+broadcast=http://104.199.139.119/ws-broadcast
+# status_page=/var/www/html/status.html
+
+# 1
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"apt-get update"}'
 
 apt-get update
+
+# 2
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"install apache php"}'
+
 apt-get install -y apache2 php5 php5-mysql php5-curl php5-gd
 
 systemctl restart apache2
+
 
 export DEBIAN_FRONTEND="noninteractive"
 
 debconf-set-selections <<< "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWD}"
 debconf-set-selections <<< "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWD}"
 
+# 3
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"install mysql"}'
+
 apt-get install -y mysql-client mysql-server
+
+# 4
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"setup html dir"}'
 
 chown -R www-data:www-data /var/www/html/
 cd /var/www/html/
 
+# 5
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"create database"}'
 create_new_db >> /tmp/debug
+
+# 6
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"install WordPress"}'
 install_wp >> /tmp/debug
+
+# 7
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"generate .htaccess"}'
 generate_htaccess >> /tmp/debug
+
 generate_robots >> /tmp/debug
+
+# 8
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"download WordPress plugins"}'
 download_plugins >> /tmp/debug
 
+# 9
+post_process $broadcast '{"hostname":"${HOSTNAME}","active":"all done"}'
 
 
