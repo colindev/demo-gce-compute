@@ -127,6 +127,10 @@ function post_process {
 
 # -------------------------------
 
+if [ -f /var/www/html/done ] ; then
+    exit 0
+fi
+
 MYSQL_ROOT_PASSWD=123
 WP_DBNAME=wp_db
 WP_DBUSER=wp
@@ -183,4 +187,5 @@ download_plugins >> /tmp/debug
 # 9
 post_process $broadcast '{"hostname":"'${HOSTNAME}'","active":"all done"}'
 
+touch /var/www/html/done
 
