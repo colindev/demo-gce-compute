@@ -282,5 +282,5 @@ func broadcast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub.Broadcast(status, nil)
+	hub.Broadcast(status)
 }
