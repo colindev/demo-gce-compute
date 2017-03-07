@@ -76,7 +76,7 @@ func main() {
 	SetWSHub(hub)
 
 	http.Handle("/", http.FileServer(http.Dir("./views")))
-	http.Handle("/ws", hub)
+	http.Handle("/ws", hub.Handler())
 	http.HandleFunc("/ws-broadcast", broadcast)
 	http.HandleFunc("/admin/api/compute/zones", listZones)
 	http.HandleFunc("/admin/api/compute/images", listDebianImages)
