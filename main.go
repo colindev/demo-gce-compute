@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path"
 
 	"github.com/colindev/wshub"
 
@@ -74,7 +76,16 @@ func main() {
 	go hub.Run()
 	SetWSHub(hub)
 
-	http.Handle("/", http.FileServer(http.Dir("./views")))
+	viewDir := "./views"
+	(func() {
+		_, err := os.Stat(viewDir)
+		if err == nil {
+			return
+		}
+		viewDir = path.Dir(os.Args[0] + "/views")
+	})()
+
+	http.Handle("/", http.FileServer(http.Dir(viewDir)))
 	http.Handle("/ws", hub.Handler())
 	http.HandleFunc("/ws-broadcast", broadcast)
 	http.HandleFunc("/admin/api/compute/zones", listZones)

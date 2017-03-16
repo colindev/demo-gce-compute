@@ -1,0 +1,16 @@
+[Unit]
+Description=Seed server for Google compute engine
+After=network.target
+
+[Service]
+Type=simple
+User={USER}
+
+ExecStart={PWD}/seed -addr :80
+ExecStop=/bin/kill -s QUIT $MAINPID
+
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
