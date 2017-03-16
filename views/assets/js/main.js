@@ -1,15 +1,23 @@
 (function($){
 
-function Config(o) {
+function Metadata(key, o) {
 
+    this.key = key
     try {
-        o = JSON.parse(localStorage.getItem('config'));
+        x = JSON.parse(localStorage.getItem(this.key));
+        for (var n in o) {
+            if (!x.hasOwnProperty(n)) {
+                x[n] = o[n];
+            }
+        }
+        o = x
     } catch(e) {} 
     for (var n in o) {
         this.set(n, o[n])
     }
+    this.store()
 }
-Config.prototype = {
+Metadata.prototype = {
     _o: {}, 
     set: function(name, value){
         this._o[name] = value;
@@ -22,17 +30,55 @@ Config.prototype = {
         return $.extend({}, this._o);
     },
     store: function(){
-        localStorage.setItem("config", JSON.stringify(this.obj()));
+        localStorage.setItem(this.key, JSON.stringify(this.obj()));
 
         console.log(this.obj())
+
+        return this;
     },
 };
 
+function Paging(arr) {
+    this._pages = arr;
+    var cur = 0;
+    $(this._pages).each(function(i, path){
+        if (path == location.pathname) {
+            cur = i;
+        }
+    });
+    this.current = cur;
+}
+
+Paging.prototype = {
+    next: function(){
+        location.href = this._pages[this.current+1];
+    },
+    prev: function(){
+        if (this.current) {
+            location.href = this._pages[this.current-1];
+        }
+    },
+    bind: function(prev, next){
+        var me = this;
+        $(prev).on('click', function(e){
+            me.prev();
+        });
+        $(next).on('click', function(e){
+            me.next();
+        });
+
+        return this;
+    }
+};
+
+// jquery plug
 $.fn.active = function(){
     this.addClass('active');
+    return this;
 };
 $.fn.unactive = function(){
     this.removeClass('active');
+    return this;
 }
 $.fn.radioButtonBox = function(prefix, conf){
     var box = this,
@@ -62,17 +108,25 @@ $.fn.radioButtonBox = function(prefix, conf){
         });
     });
 
+    return this;
 };
 
-var conf = new Config({
-    layout: "1",
-    cpu: "1",
-    memory: "1024"
-}); 
+var conf = new Metadata('config', {
+        image: "centos-7-v20170227",
+        layout: "1",
+        cpu: "1",
+        memory: "1024"
+    }), 
+    page = (new Paging([
+        "/", 
+        "/machine_type.html", 
+        "/startup_script.html"])).bind('button.paging-prev', 'button.paging-next');
 
 $('[id^=layout-]').on('click', function(e){
+    
     conf.set('layout', this.id.replace(/^layout-/, '')).store();
-    location.href = '/machine_type.html'
+    page.next();
+
 }).each(function(){
     if (this.id == 'layout-'+conf.get('layout')) {
         $(this).active();
@@ -83,11 +137,6 @@ $('[id^=layout-]').on('click', function(e){
 });
 $('#cpu').radioButtonBox('cpu-', conf);
 $('#memory').radioButtonBox('memory-', conf);
-$('#btn-machine-type-prev').on('click', function(e){
-    location.href = '/';
-});
-$('#btn-machine-type-next').on('click', function(e){
-    location.href = '/install-app.html';
-});
+$('#image-name').text(conf.get('image'));
 
 })(jQuery)
