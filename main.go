@@ -82,7 +82,7 @@ func main() {
 		if err == nil {
 			return
 		}
-		viewDir = path.Dir(os.Args[0] + "/views")
+		viewDir = path.Dir(os.Args[0]) + "/views"
 	})()
 
 	http.Handle("/", http.FileServer(http.Dir(viewDir)))

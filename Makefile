@@ -1,4 +1,4 @@
-VERSION := `git describe --tags`.`git rev-parse --short HEAD`
+VERSION := `git describe --tags | cut -d '-' -f 1`.`git rev-parse --short HEAD`
 APP := seed
 RUNUSER ?= root
 
@@ -20,7 +20,16 @@ deploy:
 						./$(APP).`cat ./VERSION` $$DIST;\
 		fi
 
-install: upgrade
+start:
+	systemctl start $(APP)
+
+stop:
+	systemctl stop $(APP)
+
+restart:
+	systemctl restart $(APP)
+
+install: link
 
 	cat ./service.temp | sed 's@{PWD}@'`pwd`'@g' | sed 's/{USER}/'$(RUNUSER)'/g' > /etc/systemd/system/$(APP).service
 
@@ -36,6 +45,13 @@ uninstall:
 	rm -i /etc/systemd/system/$(APP).service
 	systemctl daemon-reload
 
-upgrade:
+link:
 	ln -sf ./$(APP).`cat ./VERSION` ./seed
+
+upgrade: link
+	systemctl restart $(APP)
+	systemctl status $(APP)
+
+clear:
+	ls seed.* | grep -v `cat ./VERSION` | xargs rm
 
