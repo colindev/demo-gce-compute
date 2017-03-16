@@ -1,7 +1,7 @@
 <html>
 
     <head>
-        <title>Select Layout</title>
+        <title>Select Machine Type</title>
         <meta charset="utf-8" />
 <!-- Latest compiled and minified CSS -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
@@ -26,22 +26,43 @@
             </div>
         </nav>
 
+        <div class="jumbotron"></div>
+
         <div class="container">
-            <h3>選個版型</h3>
-            <div class="row">
+
+            <h3>選擇 CPU 數量</h3>
+            <div id="cpu" class="row">
                 <div class="col-md-4">
-                    <h4>Layout 1</h4>
-                    <a id="layout-1"></a>
+                    <button id="cpu-1">CPU 1</button>
                 </div>
                 <div class="col-md-4">
-                    <h4>Layout 2</h4>
-                    <a id="layout-2"></a>
+                    <button id="cpu-2">CPU 2</button>
                 </div>
                 <div class="col-md-4">
-                    <h4>Layout 3</h4>
-                    <a id="layout-3"></a>
+                    <button id="cpu-4">CPU 4</button>
                 </div>
             </div>
+
+            <h3>選擇 記憶體大小</h3>
+            <div id="memory" class="row">
+                <div class="col-md-4">
+                    <button id="memory-512">Memory 512</button>
+                </div>
+                <div class="col-md-4">
+                    <button id="memory-1024">Memory 1024</button>
+                </div>
+                <div class="col-md-4">
+                    <button id="memory-2048">Memory 2048</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <p class="text-center">
+                <button id="btn-machine-type-prev" class="btn btn-sm btn-default">上一步</button>
+                <button id="btn-machine-type-next"i class="btn btn-sm btn-primary">下一步</button>
+                </p>
+            </div>
+
         </div>
         
         <footer>

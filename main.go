@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -183,24 +182,36 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := r.FormValue("project")
-	name := r.FormValue("name")
-	zone := r.FormValue("zone")
-	machineType := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/machineTypes/%s", project, zone, r.FormValue("machine_type"))
-	image := r.FormValue("image")
-	imageURL := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/%s", image)
-	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", project, "default")
-
-	startupScript, err := ioutil.ReadFile("./scripts/install-wp-lamp.sh")
-	// startupScript, err := ioutil.ReadFile("./scripts/debug.sh")
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
+	r.ParseForm()
+	setting := Config{
+		"project":        "gcetest-156204",
+		"zone":           "asia-east1-a",
+		"cpu":            "1",    // vCPU
+		"memory":         "1024", // MB
+		"network":        "default",
+		"cloud_image":    "centos-cloud",
+		"image":          "centos-7-v20170227",
+		"name":           "",
+		"startup_script": "",
 	}
-	script := string(startupScript)
+	setting.Read(r.Form)
+
+	machineType := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/machineTypes/custom-%s-%s",
+		setting["project"],
+		setting["zone"],
+		setting["cpu"],
+		setting["memory"])
+
+	imageURL := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/images/%s",
+		setting["cloud_image"],
+		setting["image"])
+
+	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", setting["project"], setting["network"])
+
+	script := setting["startup_script"]
 
 	instance := &compute.Instance{
-		Name:        name,
+		Name:        setting["name"],
 		Description: "post via golang server",
 		MachineType: machineType,
 		Disks: []*compute.AttachedDisk{
@@ -209,7 +220,7 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 				Boot:       true,
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					DiskName:    "disk-" + name,
+					DiskName:    "disk-" + setting["name"],
 					SourceImage: imageURL,
 				},
 			},
@@ -238,7 +249,10 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	op, err := service.Instances.Insert(project, zone, instance).Do()
+	b, _ := json.MarshalIndent(instance, "", "  ")
+	fmt.Println(string(b))
+
+	op, err := service.Instances.Insert(setting["project"], setting["zone"], instance).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
