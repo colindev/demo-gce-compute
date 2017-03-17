@@ -120,7 +120,8 @@ var conf = new Metadata('config', {
     page = (new Paging([
         "/", 
         "/machine_type.html", 
-        "/startup_script.html"])).bind('button.paging-prev', 'button.paging-next');
+        "/startup_script.html",
+        "/create.html"])).bind('button.paging-prev', 'button.paging-next');
 
 $('[id^=layout-]').on('click', function(e){
     
@@ -138,5 +139,29 @@ $('[id^=layout-]').on('click', function(e){
 $('#cpu').radioButtonBox('cpu-', conf);
 $('#memory').radioButtonBox('memory-', conf);
 $('#image-name').text(conf.get('image'));
+
+$('#btn-create').on('click', function(){
+
+    var data = JSON.parse(localStorage.getItem('config'));
+
+    console.log(data)
+    return
+    // TODO 
+    // confirm instance
+    // lock button
+    // unlock button
+
+    $.ajax({
+        type: 'POST',
+        dataType: 'json',
+        data: data, 
+
+        error: function(){},
+        complete: function(){
+            // unlock button
+        },
+    });
+
+});
 
 })(jQuery)

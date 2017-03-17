@@ -1,7 +1,7 @@
 <html>
 
     <head>
-        <title>Select Layout</title>
+        <title></title>
         <meta charset="utf-8" />
 <!-- Latest compiled and minified CSS -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
@@ -21,7 +21,7 @@
         <nav class="navbar navbar-inverse navbar-fixed-top">
             <div class="container">
                 <div class="navbar-header">
-                    <span class="navbar-brand">選擇版型</span>
+                    <span class="navbar-brand" id="catalog"></span>
                 </div>
             </div>
         </nav>
@@ -30,32 +30,13 @@
         </div>
         
         <div class="container">
-            <div class="row">
-                <div class="col-md-4">
-                    <h4>Layout 1</h4>
-                    <a id="layout-1"></a>
-                </div>
-                <div class="col-md-4">
-                    <h4>Layout 2</h4>
-                    <a id="layout-2"></a>
-                </div>
-                <div class="col-md-4">
-                    <h4>Layout 3</h4>
-                    <a id="layout-3"></a>
-                </div>
-            </div>
-
-            <div class="row">
-                <p class="text-center">
-                    <button class="btn btn-sm btn-primary paging-next">下一步</button>
-                </p>
-            </div>
+        {{template "content" . }}
         </div>
         
         <footer>
             <p></p>
         </footer>
-    <script src="./assets/js/main.js"></script>
+        <script src="./assets/js/main.js"></script>
     </body>
 
 </html>

@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/colindev/wshub"
 
@@ -29,22 +32,29 @@ var (
 	wshubKey          key = 2
 )
 
+// SetComputeService ...
 func SetComputeService(service *compute.Service) {
 	ctx = context.WithValue(ctx, computeServiceKey, service)
 }
+
+// GetComputeService ...
 func GetComputeService() (*compute.Service, bool) {
 	service, ok := ctx.Value(computeServiceKey).(*compute.Service)
 	return service, ok
 }
 
+// SetWSHub ...
 func SetWSHub(hub *wshub.Hub) {
 	ctx = context.WithValue(ctx, wshubKey, hub)
 }
+
+// GetWSHub ...
 func GetWSHub() (*wshub.Hub, bool) {
 	hub, ok := ctx.Value(wshubKey).(*wshub.Hub)
 	return hub, ok
 }
 
+// ProcessStatus ...
 type ProcessStatus struct {
 	Hostname   string  `json:"hostname"`
 	Active     string  `json:"active"`
@@ -76,24 +86,57 @@ func main() {
 	go hub.Run()
 	SetWSHub(hub)
 
-	viewDir := "./views"
+	// views
+	viewDir := "./public"
 	(func() {
 		_, err := os.Stat(viewDir)
 		if err == nil {
 			return
 		}
-		viewDir = path.Dir(os.Args[0]) + "/views"
+		viewDir = path.Dir(os.Args[0]) + "/public"
 	})()
+	fsServer := http.FileServer(http.Dir(viewDir))
 
-	http.Handle("/", http.FileServer(http.Dir(viewDir)))
+	tpls := map[string]*template.Template{}
+	(func() {
+		mainTpl := path.Dir(viewDir) + "/templates/main.tpl"
+		tplDir := path.Dir(viewDir) + "/templates/contents"
+		fs, err := ioutil.ReadDir(tplDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, f := range fs {
+			name := f.Name()
+			if strings.HasSuffix(name, ".tpl") {
+				tpls[strings.TrimSuffix(name, ".tpl")] = template.Must(template.ParseFiles(mainTpl, tplDir+"/"+name))
+			}
+
+		}
+	})()
+	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimLeft(r.URL.Path, "/")
+		name = strings.TrimSuffix(name, ".html")
+		if name == "" {
+			name = "index"
+		}
+		if tpl, ok := tpls[name]; ok {
+			tpl.Execute(w, nil)
+			return
+		}
+		fsServer.ServeHTTP(w, r)
+	}))
+	// ws
 	http.Handle("/ws", hub.Handler())
 	http.HandleFunc("/ws-broadcast", broadcast)
+	// admin apis
 	http.HandleFunc("/admin/api/compute/zones", listZones)
 	http.HandleFunc("/admin/api/compute/images", listDebianImages)
 	http.HandleFunc("/admin/api/compute/instances", listComputeInstances)
 	http.HandleFunc("/admin/api/compute/instance", getComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/insert", insertComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/delete", deleteConputeInstance)
+	// run server
 	log.Println(http.ListenAndServe(addr, nil))
 }
 
@@ -268,6 +311,12 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	go func() {
+		// check instance done
+
+		// hub.Broadcast(status)
+	}()
 
 	writeRes(w, op)
 }
