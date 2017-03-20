@@ -18,7 +18,8 @@ deploy:
 			rsync -avP ./Makefile \
 						./service.temp \
 						./VERSION \
-						./views \
+						./public \
+						./templates \
 						./scripts \
 						./$(APP).`cat ./VERSION` $$DIST;\
 		fi
