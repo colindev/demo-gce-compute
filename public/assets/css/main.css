@@ -31,6 +31,11 @@ textarea#startup-script {
     height: 75vh;
 }
 
+#process-status {
+    height: 60vh;
+    overflow-y: scroll;
+}
+
 .row {
     margin-top: 10px;
 }

@@ -8,6 +8,9 @@ gobin:
 	go build -a -ldflags "-X main.version=$(VERSION)" -o $(APP).$(VERSION)
 	echo $(VERSION) > ./VERSION
 
+deploy-bucket:
+	gsutil cp bucket/installer gs://demo-compute/
+
 deploy:
 	echo ex. user@127.0.0.1:/dir
 	@read -r -p "> " DIST;\

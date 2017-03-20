@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+echo $CALLBACK_URL
+
+curl -X POST ${CALLBACK_URL} -d '{"active":"compute#instance#'$(hostname)'","items":{"install-app":"start"}}'
+
+source ${1}
+
+curl -X POST ${CALLBACK_URL} -d '{"active":"compute#instance#'$(hostname)'","items":{"install-app":"done"}}'

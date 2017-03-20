@@ -10,19 +10,22 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"cloud.google.com/go/compute/metadata"
 
 	"github.com/colindev/wshub"
 
 	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 
 	"golang.org/x/oauth2/google"
 )
 
 var (
-	addr string
-	ctx  = context.Background()
+	ctx = context.Background()
 )
 
 type key int
@@ -30,6 +33,15 @@ type key int
 var (
 	computeServiceKey key = 1
 	wshubKey          key = 2
+	env                   = struct {
+		Addr           string
+		ProjectID      string
+		BasePath       string
+		SelfInternalIP string
+	}{
+		ProjectID:      "gcetest-156204",
+		SelfInternalIP: "127.0.0.1",
+	}
 )
 
 // SetComputeService ...
@@ -56,19 +68,46 @@ func GetWSHub() (*wshub.Hub, bool) {
 
 // ProcessStatus ...
 type ProcessStatus struct {
-	Hostname   string  `json:"hostname"`
-	Active     string  `json:"active"`
-	Percentage float64 `json:"percentage,omitempty"`
+	Active string `json:"active"`
+	Items  Items  `json:"items"`
 }
 
+// Items ...
+type Items map[string]string
+
 func init() {
-	flag.StringVar(&addr, "addr", ":80", "http address")
 	log.SetFlags(log.Lshortfile)
+
+	var err error
+	if metadata.OnGCE() {
+		env.ProjectID, err = metadata.ProjectID()
+		if err != nil {
+			log.Fatal(err)
+		}
+		env.SelfInternalIP, err = metadata.InternalIP()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	basePath, err := filepath.Abs("./")
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = os.Stat(basePath + "/public")
+	if err != nil {
+		basePath = filepath.Dir(os.Args[0])
+	}
+
+	env.BasePath = basePath
+	flag.StringVar(&env.Addr, "addr", ":80", "http address")
+
 }
 
 func main() {
 
 	flag.Parse()
+	log.Printf("%+v", env)
 
 	client, err := google.DefaultClient(ctx, compute.ComputeScope)
 	if err != nil {
@@ -87,20 +126,12 @@ func main() {
 	SetWSHub(hub)
 
 	// views
-	viewDir := "./public"
-	(func() {
-		_, err := os.Stat(viewDir)
-		if err == nil {
-			return
-		}
-		viewDir = path.Dir(os.Args[0]) + "/public"
-	})()
-	fsServer := http.FileServer(http.Dir(viewDir))
+	fsServer := http.FileServer(http.Dir(env.BasePath + "/public"))
 
 	tpls := map[string]*template.Template{}
 	(func() {
-		mainTpl := path.Dir(viewDir) + "/templates/main.tpl"
-		tplDir := path.Dir(viewDir) + "/templates/contents"
+		mainTpl := env.BasePath + "/templates/main.tpl"
+		tplDir := env.BasePath + "/templates/contents"
 		fs, err := ioutil.ReadDir(tplDir)
 		if err != nil {
 			log.Fatal(err)
@@ -131,13 +162,13 @@ func main() {
 	http.HandleFunc("/ws-broadcast", broadcast)
 	// admin apis
 	http.HandleFunc("/admin/api/compute/zones", listZones)
-	http.HandleFunc("/admin/api/compute/images", listDebianImages)
+	http.HandleFunc("/admin/api/compute/images", listImages)
 	http.HandleFunc("/admin/api/compute/instances", listComputeInstances)
 	http.HandleFunc("/admin/api/compute/instance", getComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/insert", insertComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/delete", deleteConputeInstance)
 	// run server
-	log.Println(http.ListenAndServe(addr, nil))
+	log.Println(http.ListenAndServe(env.Addr, nil))
 }
 
 func writeRes(w http.ResponseWriter, v interface{}) {
@@ -159,9 +190,12 @@ func listZones(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := r.FormValue("project")
+	query := Config{
+		"project": env.ProjectID,
+	}
+	query.Read(r.URL.Query())
 
-	res, err := service.Zones.List(project).Do()
+	res, err := service.Zones.List(query["project"]).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -170,7 +204,7 @@ func listZones(w http.ResponseWriter, r *http.Request) {
 	writeRes(w, res)
 }
 
-func listDebianImages(w http.ResponseWriter, r *http.Request) {
+func listImages(w http.ResponseWriter, r *http.Request) {
 
 	service, exists := GetComputeService()
 	if !exists {
@@ -178,7 +212,12 @@ func listDebianImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := service.Images.List("debian-cloud").Do()
+	query := Config{
+		"project": "centos-cloud",
+	}
+	query.Read(r.URL.Query())
+
+	res, err := service.Images.List(query["project"]).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -195,11 +234,14 @@ func getComputeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := r.FormValue("project")
-	zone := r.FormValue("zone")
-	name := r.FormValue("name")
+	query := Config{
+		"project": env.ProjectID,
+		"zone":    "",
+		"name":    "",
+	}
+	query.Read(r.URL.Query())
 
-	res, err := service.Instances.Get(project, zone, name).Do()
+	res, err := service.Instances.Get(query["project"], query["zone"], query["name"]).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -216,10 +258,13 @@ func listComputeInstances(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := r.FormValue("project")
-	zone := r.FormValue("zone")
+	query := Config{
+		"project": env.ProjectID,
+		"zone":    "",
+	}
+	query.Read(r.URL.Query())
 
-	res, err := service.Instances.List(project, zone).Do()
+	res, err := service.Instances.List(query["project"], query["zone"]).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -237,8 +282,8 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.ParseForm()
-	setting := Config{
-		"project":        "gcetest-156204",
+	query := Config{
+		"project":        env.ProjectID,
 		"zone":           "asia-east1-a",
 		"cpu":            "1",    // vCPU
 		"memory":         "1024", // MB
@@ -248,24 +293,43 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 		"name":           "",
 		"startup_script": "",
 	}
-	setting.Read(r.Form)
+	query.Read(r.Form)
 
 	machineType := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/machineTypes/custom-%s-%s",
-		setting["project"],
-		setting["zone"],
-		setting["cpu"],
-		setting["memory"])
+		query["project"],
+		query["zone"],
+		query["cpu"],
+		query["memory"])
 
 	imageURL := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/images/%s",
-		setting["cloud_image"],
-		setting["image"])
+		query["cloud_image"],
+		query["image"])
 
-	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", setting["project"], setting["network"])
+	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", query["project"], query["network"])
 
-	script := setting["startup_script"]
+	callbackURL := "http://" + env.SelfInternalIP + "/ws-broadcast"
+	script := fmt.Sprintf(`#!/usr/bin/env bash
+
+cat <<EOF > /tmp/startup-script
+
+%s
+
+EOF
+
+chmod +x /tmp/startup-script
+
+gsutil cp gs://demo-compute/installer /tmp/
+chmod +x /tmp/installer
+
+CALLBACK_URL=%s /tmp/installer /tmp/startup-script
+	
+	`,
+		query["startup_script"],
+		callbackURL,
+	)
 
 	instance := &compute.Instance{
-		Name:        setting["name"],
+		Name:        query["name"],
 		Description: "post via golang server",
 		MachineType: machineType,
 		Disks: []*compute.AttachedDisk{
@@ -274,7 +338,7 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 				Boot:       true,
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					DiskName:    "disk-" + setting["name"],
+					DiskName:    "disk-" + query["name"],
 					SourceImage: imageURL,
 				},
 			},
@@ -290,11 +354,23 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 				Network: network,
 			},
 		},
+		ServiceAccounts: []*compute.ServiceAccount{
+			{
+				Email: "default",
+				Scopes: []string{
+					"https://www.googleapis.com/auth/devstorage.read_only",
+				},
+			},
+		},
 		Metadata: &compute.Metadata{
 			Items: []*compute.MetadataItems{
 				{
 					Key:   "startup-script",
 					Value: &script,
+				},
+				{
+					Key:   "callback-url",
+					Value: &callbackURL,
 				},
 			},
 		},
@@ -306,16 +382,57 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	b, _ := json.MarshalIndent(instance, "", "  ")
 	fmt.Println(string(b))
 
-	op, err := service.Instances.Insert(setting["project"], setting["zone"], instance).Do()
+	op, err := service.Instances.Insert(query["project"], query["zone"], instance).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
 	go func() {
-		// check instance done
 
-		// hub.Broadcast(status)
+		defer log.Println("quit check instance")
+		hub, exists := GetWSHub()
+		if !exists {
+			return
+		}
+
+		for {
+			time.Sleep(time.Second)
+			inst, err := service.Instances.Get(query["project"], query["zone"], query["name"]).Do()
+			if googleapi.IsNotModified(err) {
+				hub.Broadcast(ProcessStatus{
+					Active: "compute#create",
+					Items: Items{
+						"not-modified": err.Error(),
+					},
+				})
+			} else if err != nil {
+				hub.Broadcast(ProcessStatus{
+					Active: "compute#create",
+					Items: Items{
+						"error": err.Error(),
+					},
+				})
+			}
+			hub.Broadcast(ProcessStatus{
+				Active: "compute#instance#" + inst.Name,
+				Items: Items{
+					"status": inst.Status,
+				},
+			})
+
+			if inst.Status == "RUNNING" {
+				hub.Broadcast(ProcessStatus{
+					Active: "compute#instance#" + inst.Name,
+					Items: Items{
+						"network-ip": inst.NetworkInterfaces[0].NetworkIP,
+						"nat-ip":     inst.NetworkInterfaces[0].AccessConfigs[0].NatIP,
+					},
+				})
+				return
+			}
+		}
+
 	}()
 
 	writeRes(w, op)
