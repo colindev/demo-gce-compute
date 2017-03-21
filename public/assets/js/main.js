@@ -65,7 +65,7 @@ function connWS(url, handler) {
     ws.onmessage = handler;
     ws.onopen = function(){console.log('connected')};
     ws.onclose = function(){
-        setTimeout(function(){console.log('try reconnect');connWS(url)}, 3000);
+        setTimeout(function(){console.log('try reconnect');connWS(url, handler);}, 3000);
     };
 }
 
