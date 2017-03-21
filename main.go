@@ -388,52 +388,7 @@ CALLBACK_URL=%s /tmp/installer /tmp/startup-script
 		return
 	}
 
-	go func() {
-
-		defer log.Println("quit check instance")
-		hub, exists := GetWSHub()
-		if !exists {
-			return
-		}
-
-		for {
-			time.Sleep(time.Second)
-			inst, err := service.Instances.Get(query["project"], query["zone"], query["name"]).Do()
-			if googleapi.IsNotModified(err) {
-				hub.Broadcast(ProcessStatus{
-					Active: "compute#create",
-					Items: Items{
-						"not-modified": err.Error(),
-					},
-				})
-			} else if err != nil {
-				hub.Broadcast(ProcessStatus{
-					Active: "compute#create",
-					Items: Items{
-						"error": err.Error(),
-					},
-				})
-			}
-			hub.Broadcast(ProcessStatus{
-				Active: "compute#instance#" + inst.Name,
-				Items: Items{
-					"status": inst.Status,
-				},
-			})
-
-			if inst.Status == "RUNNING" {
-				hub.Broadcast(ProcessStatus{
-					Active: "compute#instance#" + inst.Name,
-					Items: Items{
-						"network-ip": inst.NetworkInterfaces[0].NetworkIP,
-						"nat-ip":     inst.NetworkInterfaces[0].AccessConfigs[0].NatIP,
-					},
-				})
-				return
-			}
-		}
-
-	}()
+	go checkInstance(query["project"], query["zone"], query["name"])
 
 	writeRes(w, op)
 }
@@ -446,6 +401,7 @@ func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 刪除千萬別弄預設值
 	project := r.FormValue("project")
 	zone := r.FormValue("zone")
 	name := r.FormValue("name")
@@ -455,6 +411,8 @@ func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	go checkInstance(project, zone, name)
 
 	writeRes(w, op)
 }
@@ -474,4 +432,61 @@ func broadcast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hub.Broadcast(status)
+}
+
+func checkInstance(project, zone, name string) {
+
+	defer log.Println("quit check instance")
+	service, exists := GetComputeService()
+	if !exists {
+		return
+	}
+	hub, exists := GetWSHub()
+	if !exists {
+		return
+	}
+
+	active := "compute#instance#" + name
+	items := Items{
+		"project": project,
+		"zone":    zone,
+	}
+
+	for {
+		time.Sleep(time.Second)
+		inst, err := service.Instances.Get(project, zone, name).Do()
+		if googleapi.IsNotModified(err) {
+			hub.Broadcast(ProcessStatus{
+				Active: active,
+				Items: Items{
+					"not-modified": err.Error(),
+				},
+			})
+		} else if err != nil {
+			hub.Broadcast(ProcessStatus{
+				Active: active,
+				Items: Items{
+					"error": err.Error(),
+				},
+			})
+			return
+		}
+
+		items["status"] = inst.Status
+		hub.Broadcast(ProcessStatus{
+			Active: active,
+			Items:  items,
+		})
+
+		if inst.Status == "RUNNING" {
+			items["network-ip"] = inst.NetworkInterfaces[0].NetworkIP
+			items["nat-ip"] = inst.NetworkInterfaces[0].AccessConfigs[0].NatIP
+			hub.Broadcast(ProcessStatus{
+				Active: active,
+				Items:  items,
+			})
+			return
+		}
+	}
+
 }

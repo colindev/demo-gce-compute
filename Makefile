@@ -22,6 +22,8 @@ deploy:
 						./templates \
 						./scripts \
 						./$(APP).`cat ./VERSION` $$DIST;\
+			ssh $${DIST%:*} 'cd ~/seed && sudo make upgrade'; \
+			ssh $${DIST%:*} 'cd ~/seed && ls -l ./';\
 		fi
 
 start:

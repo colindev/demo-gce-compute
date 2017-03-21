@@ -36,6 +36,19 @@ textarea#startup-script {
     overflow-y: scroll;
 }
 
+.instance li {
+    color: rgba(0,0,0,0.6);
+}
+.instance li span {
+    color: green;
+    display: inline-block;
+}
+.instance li span:before {
+    content:":";
+    padding-right: 0.3em;
+}
+
+/* bootstrap */
 .row {
     margin-top: 10px;
 }

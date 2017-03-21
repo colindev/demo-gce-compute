@@ -1,86 +1,8 @@
-(function($){
+(function(factory){
 
-function Metadata(key, o) {
+    factory(self.jQuery, self.Metadata, self.Paging);
 
-    this.key = key
-    try {
-        x = JSON.parse(localStorage.getItem(this.key));
-        for (var n in o) {
-            if (!x.hasOwnProperty(n)) {
-                x[n] = o[n];
-            }
-        }
-        o = x
-    } catch(e) {} 
-    for (var n in o) {
-        this.set(n, o[n])
-    }
-    this.store()
-}
-Metadata.prototype = {
-    _o: {}, 
-    set: function(name, value){
-        this._o[name] = value;
-        return this;
-    },
-    get: function(name){
-        return this._o[name];
-    },
-    obj: function(){
-        return $.extend({}, this._o);
-    },
-    store: function(){
-        localStorage.setItem(this.key, JSON.stringify(this.obj()));
-
-        console.log(this.obj())
-
-        return this;
-    },
-};
-
-function Paging(arr) {
-    this._pages = arr;
-    var cur = 0;
-    $(this._pages).each(function(i, item){
-        if (item.path == location.pathname) {
-            cur = i;
-        }
-    });
-    this._current = cur;
-}
-
-Paging.prototype = {
-    next: function(){
-        location.href = this._pages[this._current+1].path;
-    },
-    prev: function(){
-        if (this.current) {
-            location.href = this._pages[this._current-1].path;
-        }
-    },
-    current: function(prop){
-        return this._pages[this._current][prop];
-    },
-    bind: function(prev, next){
-        var me = this;
-        $(prev).on('click', function(e){
-            me.prev();
-        });
-        $(next).on('click', function(e){
-            me.next();
-        });
-
-        if (this._current == 0) {
-            $(prev).hide();
-        }
-
-        if (this._current == this._pages.length -1) {
-            $(next).hide();
-        }
-
-        return this;
-    }
-};
+})(function($, Metadata, Paging){
 
 // jquery plug
 $.fn.active = function(){
@@ -94,11 +16,13 @@ $.fn.unactive = function(){
 $.fn.lock = function(){
     if (this.prop('tagName').match(/^(input|button)$/i)) {
         this.attr('readonly', 'readonly');
+        this.attr('disabled', 'disabled');
     }
 };
 $.fn.unlock = function(){
     if (this.prop('tagName').match(/^(input|button)$/i)) {
         this.removeAttr('readonly');
+        this.removeAttr('disabled');
     }
 };
 $.fn.radioButtonBox = function(prefix, conf){
@@ -132,6 +56,16 @@ $.fn.radioButtonBox = function(prefix, conf){
     return this;
 };
 
+var ws = null;
+function connWS(url, handler) {
+    ws = new WebSocket(url);
+    ws.onmessage = handler;
+    ws.onopen = function(){console.log('connected')};
+    ws.onclose = function(){
+        setTimeout(function(){console.log('try reconnect');connWS(url)}, 3000);
+    };
+}
+
 var conf = new Metadata('config', {
         name: "",
         image: "centos-7-v20170227",
@@ -146,24 +80,28 @@ var conf = new Metadata('config', {
         {path:"/create.html", name:"虛擬機狀態"}])).bind('button.paging-prev', 'button.paging-next');
 
 $('#catalog').html(conf.get('image')+`<span>${page.current('name')}</span>`);
-
-// ---
-$('#cpu').radioButtonBox('cpu-', conf);
-$('#memory').radioButtonBox('memory-', conf);
-
-// ---
-$('#startup-script').val(conf.get("startup_script")).on('change', function(e){
-    conf.set("startup_script", this.value).store();
+$(document).ajaxError(function(e, xhr, sets, err){
+    alert(xhr.responseText)
 });
 
-// ---
-$('input#compute-name').on('change', function(){
-    conf.set('name', this.value).store();
-}).val(conf.get('name'));
+page.on(['/', '/index.html'], function(){
 
-// ---
-var ws = null,
-    processBox = document.getElementById('process-status');
+    $('#cpu').radioButtonBox('cpu-', conf);
+    $('#memory').radioButtonBox('memory-', conf);
+
+}).on('/startup_script.html', function(){
+
+    $('#startup-script').val(conf.get("startup_script")).on('change', function(e){
+        conf.set("startup_script", this.value).store();
+    });
+    
+    $('input#compute-name').on('change', function(){
+        conf.set('name', this.value).store();
+    }).val(conf.get('name'));
+
+}).on('/create.html', function(){
+
+var processBox = document.getElementById('process-status');
 
 function onmessage(e){
 
@@ -187,16 +125,8 @@ function onmessage(e){
     }
 
 };
-function connWS(url) {
-    ws = new WebSocket(url);
-    ws.onmessage = onmessage;
-    ws.onopen = function(){console.log('connected')};
-    ws.onclose = function(){
-        setTimeout(function(){console.log('try reconnect');connWS(url)}, 3000);
-    };
-}
 
-connWS(`ws://${location.host}/ws`)
+connWS(`ws://${location.host}/ws`, onmessage);
 
 $('#detail-cpu').text(conf.get('cpu'));
 $('#detail-memory').text(conf.get('memory'));
@@ -206,7 +136,6 @@ $('#btn-create').on('click', function(){
     var $me = $(this),
         data = JSON.parse(localStorage.getItem('config'));
 
-    console.log(data)
     if (!confirm('確認新增?')) {
         return
     }
@@ -231,5 +160,140 @@ $('#btn-create').on('click', function(){
 
 });
 
+}).on('/instances.html', function(){
 
-})(jQuery)
+    var collection = {},
+        $projectSelect = $('#sel-projects'),
+        $zoneSelect = $('#sel-zones'),
+        $instances = $('#instances'),
+        $tmpInstance = $(`
+                        <div class="instance col-xs-6 col-lg-4">
+                                <h3></h3> <button class="btn-delete">delete</button>
+                                <ul class="inner">
+                                    <li class="status">Status<span></span></li>
+                                    <li class="ip">Nat IP<span></span></li>
+                                    <li class="network_ip">network IP<span></span></li>
+                                </ul>
+                            </div>
+                        `);
+    
+    connWS(`ws://${location.host}/ws`, function(e){
+        
+        var data = JSON.parse(e.data),
+            project = $projectSelect.val(),
+            zone = $zoneSelect.val(),
+            m;
+
+        console.log(data)
+
+        if (data.items["project"] != project || data.items["zone"] != zone) {
+            return
+        }
+
+        if (m = data.active.match(/^compute#instance#([-\w]+)$/)) {
+
+            var name = m[1];
+            console.log(name, collection[name])
+
+            if ( ! collection[name]) {
+                if (data.items["status"] == "STOPPING") return;
+                if (data.items["status"] == "TERMINATED") return;
+                $.get(`/admin/api/compute/instance?project=${project}&zone=${zone}&name=${name}`, function(json, stateText, xhr){
+                    insert(json);
+                });
+            }
+
+            if (collection[name]) {
+                collection[name].find('.status > span').text(data.items["status"]);
+                if (data.items["status"] == "RUNNING") {
+                    $.get(`/admin/api/compute/instance?project=${project}&zone=${zone}&name=${name}`, function(json, stateText, xhr){
+                        collection[name].data('item', json);
+                        displayIP(collection[name], collection[name].data('item'));
+                    });
+                }
+                if (data.items["status"] == "TERMINATED") {
+                    collection[name].remove();
+                    delete collection[name];
+                }
+            }
+
+        }
+    });
+
+    function displayIP($item, item) {
+        var networkIPList = [],
+                ipList = [];
+        for (var i = 0, iLen = item.networkInterfaces.length; i < iLen; i++) {
+                        for (var j = 0, jLen = item.networkInterfaces[i].accessConfigs.length; j < jLen; j++) {
+                                            ipList.push(item.networkInterfaces[i].accessConfigs[j].natIP);
+                                        }
+                        networkIPList.push(item.networkInterfaces[i].networkIP);
+                    }
+        $item.find('.ip > span').text(ipList.join(','))
+        $item.find('.network_ip > span').text(networkIPList.join(','))
+        return ipList.pop();
+    }
+
+    function insert(item) {
+        var $item = $tmpInstance.clone();
+        $item.attr("ref", item.name);
+        $item.data('item', item);
+        $item.find('h3').text(item.name);
+        $item.find('.status > span').text(item.status);
+        $instances.append($item)
+        displayIP($item, item);
+        collection[item.name] = $item;
+        return $item;
+    }
+
+    function initZones(project) {
+        $zoneSelect.empty()
+        $.get(`/admin/api/compute/zones?project=${project}`, function(json, stateText, xhr){
+            $(json.items).each(function(i, item){
+                $zoneSelect.append(`<option>${item.name}</option>`);
+            });
+            $zoneSelect.val('asia-east1-a').change();
+        });
+    }
+
+    $zoneSelect.on('change', function(){
+        $instances.empty();
+        var project = $projectSelect.val(),
+            zone = $zoneSelect.val();
+        // fetch all instances
+        $.get(`/admin/api/compute/instances?project=${project}&zone=${zone}`, function(json, stateText, xhr){
+            $.each(json.items, function(_, item){
+                insert(item);
+            }, "json")
+        });
+    });
+    $projectSelect.on('change', function(){
+        initZones(this.value)
+    }).change();
+
+    // deletion
+    $instances.on('click', 'button.btn-delete', function(e){
+        var $this = $(this),
+        item = $this.parent().data('item');
+        if (item.name == 'vm-test-1') {
+            alert('這個不能刪')
+            return
+        }
+                                                
+        var project = item.zone.replace(/^.*\/projects\/([-\w]+)\/.*$/, '$1'),
+            zone = item.zone.replace(/^.*\//, '');
+
+        $this.lock();
+                
+        $.ajax({
+            type: 'DELETE',
+            url: `/admin/api/compute/instances/delete?project=${project}&zone=${zone}&name=${item.name}`,
+            error: function(){
+               $this.unlock();
+            },
+        });
+    });
+
+}).listen();
+
+});

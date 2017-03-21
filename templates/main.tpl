@@ -23,6 +23,12 @@
                 <div class="navbar-header">
                     <span class="navbar-brand" id="catalog"></span>
                 </div>
+                <div id="navbar" class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav navbar-right">
+                        <li><a href="/instances.html">虛擬機列表</a></li>
+                        <li><a href="/">新增虛擬機</a></li>
+                    </ul>
+                </div>
             </div>
         </nav>
 
@@ -36,6 +42,8 @@
         <footer>
             <p></p>
         </footer>
+        <script src="./assets/js/metadata.js"></script>
+        <script src="./assets/js/paging.js"></script>
         <script src="./assets/js/main.js"></script>
     </body>
 
