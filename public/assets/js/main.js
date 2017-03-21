@@ -25,33 +25,36 @@ $.fn.unlock = function(){
         this.removeAttr('disabled');
     }
 };
-$.fn.radioButtonBox = function(prefix, conf){
+$.fn.radioButtonBox = function(prefix, conf, onchange){
     var box = this,
         propName = prefix.replace(/[^a-z]*$/, ''),
         rePrefix = new RegExp(`^${prefix}`),
-        collect = [];
+        collect = [], 
+        clickHandler = function(e){
+        
+            var me = this;
+            $(collect).each(function(i, btn){
+                if (btn === me) {
+                    $(this).active();
+                    conf.set(propName, me.id.replace(rePrefix, '')).store();
+                    return
+                }
+                $(this).unactive();
+            });
+    
+            if (onchange && onchange.call) {
+                onchange.call(me, conf.get(propName));
+            }
+        };
+
 
     $(box).find(`button[id^=${prefix}]`).each(function(){
-        
         collect.push(this);
-        if (this.id == prefix+conf.get(propName)) {
-            $(this).active()
-            return
-        }
-        $(this).unactive();
+    }).on('click', clickHandler);
 
-    }).on('click', function(e){
-        
-        var me = this;
-        conf.set(propName, this.id.replace(rePrefix, '')).store();
-        $(collect).each(function(i, btn){
-            if (btn === me) {
-                $(this).active();
-                return
-            }
-            $(this).unactive();
-        });
-    });
+    this.change = function(){
+        clickHandler.call(box.find("#"+prefix+conf.get(propName)).get(0));
+    };
 
     return this;
 };
@@ -86,8 +89,27 @@ $(document).ajaxError(function(e, xhr, sets, err){
 
 page.on(['/', '/index.html'], function(){
 
-    $('#cpu').radioButtonBox('cpu-', conf);
-    $('#memory').radioButtonBox('memory-', conf);
+    var $memory = $('#memory').on('change', function(){
+            conf.set('memory', this.value).store();
+            $('#display-memory').val(this.value);
+        });
+
+    $('#display-memory').on('change', function(){
+        $memory.val(this.value).change();
+    })
+
+    $('#cpu').radioButtonBox('cpu-', conf, function(cpu){
+        cpu = parseInt(cpu, 10);
+
+        var min = Math.ceil((cpu * 0.9 * 1024) / 256) * 256 ,
+            max = Math.floor((cpu * 6.5 * 1024) / 256) * 256,
+            current = parseFloat(conf.get("memory"));
+
+        if (current < min) current = min;
+
+        $memory.attr('min', min).attr('max', max).attr('step', 256).val(current).change();
+
+    }).change();
 
 }).on('/startup_script.html', function(){
 
