@@ -53,7 +53,7 @@ $.fn.radioButtonBox = function(prefix, conf, onchange){
     }).on('click', clickHandler);
 
     this.change = function(){
-        clickHandler.call(box.find("#"+prefix+conf.get(propName)).get(0));
+        clickHandler.call(box.find("#"+prefix+conf.get(propName)).get(0) || box.find(`[id^=${prefix}]`).first().get(0));
     };
 
     return this;
@@ -89,16 +89,25 @@ $(document).ajaxError(function(e, xhr, sets, err){
 
 page.on(['/', '/index.html'], function(){
 
-    var $memory = $('#memory').on('change', function(){
+    var $cpu = $('#cpu'),
+        $memory = $('#memory').on('change', function(){
             conf.set('memory', this.value).store();
             $('#display-memory').val(this.value);
         });
+
+    $([1,2,4,6,8,10,12,14]).each(function(i, cpu){
+        $cpu.append(`
+            <div class="col-xs-4 col-md-3">
+                <button id="cpu-${cpu}">CPU ${cpu}</button>
+            </div>
+        `)
+    });
 
     $('#display-memory').on('change', function(){
         $memory.val(this.value).change();
     })
 
-    $('#cpu').radioButtonBox('cpu-', conf, function(cpu){
+    $cpu.radioButtonBox('cpu-', conf, function(cpu){
         cpu = parseInt(cpu, 10);
 
         var min = Math.ceil((cpu * 0.9 * 1024) / 256) * 256 ,
