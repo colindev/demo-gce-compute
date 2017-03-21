@@ -82,7 +82,6 @@ var conf = new Metadata('config', {
         {path:"/startup_script.html", name:"啟動腳本"},
         {path:"/create.html", name:"虛擬機狀態"}])).bind('button.paging-prev', 'button.paging-next');
 
-$('#catalog').html(conf.get('image')+`<span>${page.current('name')}</span>`);
 $(document).ajaxError(function(e, xhr, sets, err){
     alert(xhr.responseText)
 });
@@ -191,7 +190,9 @@ $('#btn-create').on('click', function(){
 
 });
 
-}).on('/instances.html', function(){
+}).on('/instances.html', function(o){
+
+    o.name = "虛擬機列表"
 
     var collection = {},
         $projectSelect = $('#sel-projects'),
@@ -326,5 +327,7 @@ $('#btn-create').on('click', function(){
     });
 
 }).listen();
+
+$('#catalog').html(conf.get('image')+`<span>${page.current('name')}</span>`);
 
 });

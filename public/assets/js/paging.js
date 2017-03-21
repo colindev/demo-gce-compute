@@ -6,6 +6,7 @@
 
  
 function Paging(arr) {
+    this._params = {};
     this._pages = arr;
     this._handlers = {};
 
@@ -28,7 +29,7 @@ Paging.prototype = {
         }
     },
     current: function(prop){
-        return this._pages[this._current][prop];
+        return this._params[prop];
     },
     bind: function(prev, next){
         var me = this;
@@ -70,7 +71,11 @@ Paging.prototype = {
             return
         }
 
-        handler.call(this);
+        var o = $.extend({}, this._pages[this._current] || {});
+
+        handler.call(this, o);
+
+        this._params = o;
     },
     listen: function(){
         this.trigger(location.pathname);
