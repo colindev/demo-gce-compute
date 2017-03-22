@@ -27,7 +27,8 @@ xxx_callback(){
     name=`hostname`
     cur=${1}
     total=${2}
-    curl -X POST -d '{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'"}}' '{{.Callback}}'
+    msg=${3}
+    curl -X POST -d '{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'","message":"'$msg'"}}' '{{.Callback}}'
 }
 
 export -f xxx_self_ip 
@@ -39,7 +40,10 @@ cat <<EOF > /tmp/startup_script
 {{.StartupScript}}
 EOF
 
+xxx_callback 0 0 'create custom script'
 chmod +x /tmp/startup_script
 
+xxx_callback 0 0 'start run custom script'
 /tmp/startup_script
 
+xxx_callback 0 0 'finish custom script'

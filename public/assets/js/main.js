@@ -196,10 +196,8 @@ $('#btn-create').on('click', function(){
 
         error: function(xhr, stateText, err){
             alert(err);
-        },
-        complete: function(){
             $me.unlock();
-        },
+        }
     });
 
 });
