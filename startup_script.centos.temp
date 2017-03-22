@@ -27,7 +27,7 @@ xxx_callback(){
     name=`hostname`
     cur=${1}
     total=${2}
-    msg=${3}
+    msg="${3}"
     curl -X POST -d '{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'","message":"'$msg'"}}' '{{.Callback}}'
 }
 
@@ -35,6 +35,7 @@ export -f xxx_self_ip
 export -f xxx_once xxx_once_check xxx_force_retry
 export -f xxx_callback
 
+xxx_callback 0 0 'export funcs'
 
 cat <<EOF > /tmp/startup_script
 {{.StartupScript}}
