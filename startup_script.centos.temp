@@ -28,7 +28,11 @@ xxx_callback(){
     cur=${1}
     total=${2}
     msg="${3}"
-    curl -X POST -d '{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'","message":"'$msg'"}}' '{{.Callback}}'
+    data='{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'","message":"'$msg'"}}'
+    callback_url='{{.Callback}}'
+    echo POST $callback
+    echo $data
+    curl -X POST -d "$data" $callback_url
 }
 
 export -f xxx_self_ip 

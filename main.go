@@ -419,6 +419,9 @@ func broadcast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	b, _ := json.MarshalIndent(status, "", "  ")
+	log.Println("receive broadcast")
+	log.Println(string(b))
 	hub.Broadcast(status)
 }
 
