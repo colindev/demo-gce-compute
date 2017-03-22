@@ -74,8 +74,18 @@ var conf = new Metadata('config', {
         image: "centos-7-v20170227",
         cpu: "1",
         memory: "1024",
-        startup_script: "#!/usr/bin/env bash\n\nyum update -y"
-    }), 
+        startup_script: `#!/usr/bin/env bash
+# 你可以使用下列 func
+# - xxx_once
+# - xxx_once_check
+# - xxx_force_retry
+# - xxx_self_ip
+# - xxx_callback [current=1] [total=10]
+
+yum update -y
+
+
+`}), 
     page = (new Paging([
         {path:"/", name: "虛擬機規格"}, 
         // {path:"/machine_type.html", name: "虛擬機規格"}, 

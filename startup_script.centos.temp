@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+xxx_self_ip(){
+    curl -H "Metadata-Flavor:Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/ip
+}
+
+xxx_once(){
+
+    local lcf=${1-/var/run/startup.lock}
+    echo lock $lcf
+    touch $lcf
+}
+
+xxx_once_check(){
+    local lcf=${1-/var/run/startup.lock}
+    echo check $lcf
+    test -f $lcf && return 1 || return 0
+}
+
+xxx_force_retry(){
+    local lcf=${1-/var/run/startup.lock}
+    echo rm $lcf
+    rm -f $lcf
+}
+
+xxx_callback(){
+    name=`hostname`
+    cur=${1}
+    total=${2}
+    curl -X POST -d '{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'"}}' '{{.Callback}}'
+}
+
+export -f xxx_self_ip 
+export -f xxx_once xxx_once_check xxx_force_retry
+export -f xxx_callback
+
+
+cat <<EOF > /tmp/startup_script
+{{.StartupScript}}
+EOF
+
+chmod +x /tmp/startup_script
+
+/tmp/startup_script
+

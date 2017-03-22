@@ -17,6 +17,7 @@ deploy:
 		if [ -n "$$DIST" ] ; then \
 			rsync -avP ./Makefile \
 						./service.temp \
+						./startup_script.*.temp \
 						./VERSION \
 						./public \
 						./templates \

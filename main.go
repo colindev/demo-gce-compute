@@ -308,25 +308,13 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", query["project"], query["network"])
 
 	callbackURL := "http://" + env.SelfInternalIP + "/ws-broadcast"
-	script := fmt.Sprintf(`#!/usr/bin/env bash
-
-cat <<EOF > /tmp/startup-script
-
-%s
-
-EOF
-
-chmod +x /tmp/startup-script
-
-gsutil cp gs://demo-compute/installer /tmp/
-chmod +x /tmp/installer
-
-CALLBACK_URL=%s /tmp/installer /tmp/startup-script
-	
-	`,
-		query["startup_script"],
-		callbackURL,
-	)
+	b, err := ioutil.ReadFile(env.BasePath + "/startup_script.centos.temp")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	script := strings.Replace(string(b), "{{.Callback}}", callbackURL, -1)
+	script = strings.Replace(script, "{{.StartupScript}}", query["startup_script"], 1)
 
 	instance := &compute.Instance{
 		Name:        query["name"],
@@ -379,7 +367,7 @@ CALLBACK_URL=%s /tmp/installer /tmp/startup-script
 		},
 	}
 
-	b, _ := json.MarshalIndent(instance, "", "  ")
+	b, _ = json.MarshalIndent(instance, "", "  ")
 	fmt.Println(string(b))
 
 	op, err := service.Instances.Insert(query["project"], query["zone"], instance).Do()
