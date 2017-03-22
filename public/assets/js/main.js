@@ -95,7 +95,7 @@ var conf = new Metadata('config', {
 # - xxx_once_check
 # - xxx_force_retry
 # - xxx_self_ip
-# - xxx_callback [current=1] [total=10]
+# - xxx_callback [current=1] [total=10] [msg='']
 
 yum update -y
 
