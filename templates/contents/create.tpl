@@ -19,6 +19,10 @@
 </div>
 
 <div class="row">
+    <div id="process"></div>
+</div>
+
+<div class="row">
     <div id="process-status"></div>
 </div>
 

@@ -156,7 +156,8 @@ page.on(['/', '/index.html'], function(){
 
 }).on('/create.html', function(){
 
-var processBox = document.getElementById('process-status');
+var processBox = document.getElementById('process-status'),
+    $processBar = $('#process');
 
 function onmessage(e){
 
@@ -167,6 +168,7 @@ function onmessage(e){
         return
     }
 
+    $processBar.attr('status', status.items.status);
     processBox.innerText += '\n'+e.data;
     processBox.scrollTop = processBox.scrollHeight;
     if (status.items["status"]) {

@@ -28,7 +28,8 @@ xxx_callback(){
     cur=${1}
     total=${2}
     msg="${3}"
-    data='{"active":"compute#instance#'${name}'","items":{"status":"STARTUP","current":"'$cur'","total":"'$total'","message":"'$msg'"}}'
+    status=${4-STARTUP}
+    data='{"active":"compute#instance#'${name}'","items":{"status":"'$status'","current":"'$cur'","total":"'$total'","message":"'$msg'"}}'
     callback_url='{{.Callback}}'
     echo POST $callback
     echo $data
@@ -51,4 +52,4 @@ chmod +x /tmp/startup_script
 xxx_callback 0 0 'start run custom script'
 /tmp/startup_script
 
-xxx_callback 0 0 'finish custom script'
+xxx_callback 0 0 'finish custom script' DONE

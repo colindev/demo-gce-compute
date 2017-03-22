@@ -48,6 +48,33 @@ textarea#startup-script {
     padding-right: 0.3em;
 }
 
+#process {
+    transition: all 0.5s ease;
+    height: 10px;
+    background-color: rgba(255,255,255,1);
+    width: 0;
+}
+#process[status=PROVISIONING] {
+    background-color: rgba(255,200,200,1);
+    width: 20%;
+}
+#process[status=STAGING] {
+    background-color: rgba(230,155,155,1);
+    width: 30%;
+}
+#process[status=RUNNING] {
+    background-color: rgba(230,125,125,1);
+    width: 40%;
+}
+#process[status=STARTUP] {
+    background-color: rgba(230,95,95,1);
+    width: 60%;
+}
+#process[status=DONE] {
+    background-color: rgba(230,65,65,1);
+    width: 100%;
+}
+
 /* bootstrap */
 .row {
     margin-top: 10px;
