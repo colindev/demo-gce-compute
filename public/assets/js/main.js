@@ -58,6 +58,17 @@ $.fn.radioButtonBox = function(prefix, conf, onchange){
 
     return this;
 };
+$.fn.confirmButton = function(arr, handler){
+    var $me = this, ind = 0;
+
+    return this.text(arr[ind]).on('click', function(e){
+        ind++; 
+        if (ind >= arr.length) {
+            return handler.call(this, e);
+        } 
+        $me.text(arr[ind]);
+    });
+};
 
 var ws = null;
 function connWS(url, handler) {
@@ -175,14 +186,10 @@ connWS(`ws://${location.host}/ws`, onmessage);
 $('#detail-cpu').text(conf.get('cpu'));
 $('#detail-memory').text(conf.get('memory'));
 $('#detail-name').text(conf.get('name'));
-$('#btn-create').on('click', function(){
+$('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], function(e){
 
     var $me = $(this),
         data = JSON.parse(localStorage.getItem('config'));
-
-    if (!confirm('確認新增?')) {
-        return
-    }
 
     $('#detail-network-ip').text('')
     $('#detail-nat-ip').text('')
