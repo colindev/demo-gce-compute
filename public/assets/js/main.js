@@ -75,7 +75,11 @@ var conf = new Metadata('config', {
         cpu: "1",
         memory: "1024",
         startup_script: `#!/usr/bin/env bash
-# 你可以使用下列 func
+##########################################
+#             IMPORTANT                  # 
+# Do not use characters other than ascii #
+##########################################
+# you can use funcs below
 # - xxx_once
 # - xxx_once_check
 # - xxx_force_retry
