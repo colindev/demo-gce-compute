@@ -19,51 +19,61 @@ import (
 	"github.com/colindev/wshub"
 
 	compute "google.golang.org/api/compute/v1"
+	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 
 	"golang.org/x/oauth2/google"
 )
 
-var (
-	ctx = context.Background()
-)
-
 type key int
 
 var (
-	computeServiceKey key = 1
-	wshubKey          key = 2
-	env                   = struct {
-		Addr           string
-		ProjectID      string
+	client         *http.Client
+	computeService *compute.Service
+	hub            *wshub.Hub
+	env            = struct {
+		ctx       context.Context
+		Addr      string
+		ProjectID string
+		Region    string
+		Zone      string
+
+		DomainName        string
+		DNSManageZoneName string
+
+		OSFamily  string
+		OSProject string
+		OSVersion string
+
 		BasePath       string
 		SelfInternalIP string
 	}{
-		ProjectID:      "gcetest-156204",
+		ctx:       context.Background(),
+		ProjectID: "gcetest-156204",
+		Region:    "asia-east1",
+		Zone:      "asia-east1-a",
+
+		DomainName:        "jan23.me",
+		DNSManageZoneName: "test-jan23-me",
+
+		OSFamily:  "centos",
+		OSProject: "centos-cloud",
+		OSVersion: "centos-7-v20170227",
+
 		SelfInternalIP: "127.0.0.1",
 	}
 )
 
-// SetComputeService ...
-func SetComputeService(service *compute.Service) {
-	ctx = context.WithValue(ctx, computeServiceKey, service)
+func getClient() *http.Client {
+	return client
 }
 
-// GetComputeService ...
-func GetComputeService() (*compute.Service, bool) {
-	service, ok := ctx.Value(computeServiceKey).(*compute.Service)
-	return service, ok
+func getComputeService() *compute.Service {
+	return computeService
 }
 
-// SetWSHub ...
-func SetWSHub(hub *wshub.Hub) {
-	ctx = context.WithValue(ctx, wshubKey, hub)
-}
-
-// GetWSHub ...
-func GetWSHub() (*wshub.Hub, bool) {
-	hub, ok := ctx.Value(wshubKey).(*wshub.Hub)
-	return hub, ok
+func getWSHub() *wshub.Hub {
+	return hub
 }
 
 // ProcessStatus ...
@@ -102,28 +112,24 @@ func init() {
 	env.BasePath = basePath
 	flag.StringVar(&env.Addr, "addr", ":80", "http address")
 
+	client, err = google.DefaultClient(env.ctx, compute.ComputeScope, dns.NdevClouddnsReadwriteScope)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	computeService, err = compute.New(client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	hub = wshub.New()
+	go hub.Run()
 }
 
 func main() {
 
 	flag.Parse()
 	log.Printf("%+v", env)
-
-	client, err := google.DefaultClient(ctx, compute.ComputeScope)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	service, err := compute.New(client)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	SetComputeService(service)
-
-	hub := wshub.New()
-	go hub.Run()
-	SetWSHub(hub)
 
 	// views
 	fsServer := http.FileServer(http.Dir(env.BasePath + "/public"))
@@ -167,6 +173,8 @@ func main() {
 	http.HandleFunc("/admin/api/compute/instance", getComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/insert", insertComputeInstance)
 	http.HandleFunc("/admin/api/compute/instances/delete", deleteConputeInstance)
+	http.HandleFunc("/admin/api/address", getAddress)
+	http.HandleFunc("/admin/api/addresses/insert", insertAddress)
 	// run server
 	log.Println(http.ListenAndServe(env.Addr, nil))
 }
@@ -184,8 +192,8 @@ func writeRes(w http.ResponseWriter, v interface{}) {
 
 func listZones(w http.ResponseWriter, r *http.Request) {
 
-	service, exists := GetComputeService()
-	if !exists {
+	service := getComputeService()
+	if service == nil {
 		http.Error(w, "compute service not found", 500)
 		return
 	}
@@ -206,14 +214,14 @@ func listZones(w http.ResponseWriter, r *http.Request) {
 
 func listImages(w http.ResponseWriter, r *http.Request) {
 
-	service, exists := GetComputeService()
-	if !exists {
+	service := getComputeService()
+	if service == nil {
 		http.Error(w, "compute service not found", 500)
 		return
 	}
 
 	query := Config{
-		"project": "centos-cloud",
+		"project": env.OSProject,
 	}
 	query.Read(r.URL.Query())
 
@@ -228,8 +236,8 @@ func listImages(w http.ResponseWriter, r *http.Request) {
 
 func getComputeInstance(w http.ResponseWriter, r *http.Request) {
 
-	service, exists := GetComputeService()
-	if !exists {
+	service := getComputeService()
+	if service == nil {
 		http.Error(w, "compute service not found", 500)
 		return
 	}
@@ -252,8 +260,8 @@ func getComputeInstance(w http.ResponseWriter, r *http.Request) {
 
 func listComputeInstances(w http.ResponseWriter, r *http.Request) {
 
-	service, exists := GetComputeService()
-	if !exists {
+	service := getComputeService()
+	if service == nil {
 		http.Error(w, "compute service not found", 500)
 		return
 	}
@@ -275,25 +283,30 @@ func listComputeInstances(w http.ResponseWriter, r *http.Request) {
 
 func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 
-	service, exists := GetComputeService()
-	if !exists {
+	service := getComputeService()
+	if service == nil {
 		http.Error(w, "compute service not found", 500)
 		return
 	}
 
-	r.ParseForm()
 	query := Config{
 		"project":        env.ProjectID,
-		"zone":           "asia-east1-a",
+		"zone":           env.Zone,
 		"cpu":            "1",    // vCPU
 		"memory":         "1024", // MB
 		"network":        "default",
-		"cloud_image":    "centos-cloud",
-		"image":          "centos-7-v20170227",
+		"subdomain":      "",
+		"cloud_image":    env.OSProject,
+		"image":          env.OSVersion,
 		"name":           "",
 		"startup_script": "",
 	}
-	query.Read(r.Form)
+	r.ParseForm()
+	ctx := query.Read(r.Form).WithContext(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
+	ctx = context.WithValue(ctx, "service", service)
+	ctx = context.WithValue(ctx, "region", zone2region(query["zone"]))
+	ctx = context.WithValue(ctx, "address_name", query["subdomain"]+"-"+strings.Replace(env.DomainName, ".", "-", -1))
 
 	machineType := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/machineTypes/custom-%s-%s",
 		query["project"],
@@ -308,7 +321,7 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	network := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s", query["project"], query["network"])
 
 	callbackURL := "http://" + env.SelfInternalIP + "/ws-broadcast"
-	b, err := ioutil.ReadFile(env.BasePath + "/startup_script.centos.temp")
+	b, err := ioutil.ReadFile(env.BasePath + "/startup_script." + env.OSFamily + ".temp")
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -376,39 +389,57 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go checkInstance(query["project"], query["zone"], query["name"])
+	c := make(chan context.Context, 1)
+	go checkInstance(ctx, cancel, c)
+	go func() {
+		select {
+		case <-ctx.Done():
+			log.Println(ctx.Err())
+			return
+		case ctx := <-c:
+			makeStaticIP(ctx, cancel, c)
+			insertDNSCName(ctx, cancel, c)
+		}
+	}()
 
 	writeRes(w, op)
 }
 
 func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 
-	service, exists := GetComputeService()
-	if !exists {
+	service := getComputeService()
+	if service == nil {
 		http.Error(w, "compute service not found", 500)
 		return
 	}
 
 	// 刪除千萬別弄預設值
-	project := r.FormValue("project")
-	zone := r.FormValue("zone")
-	name := r.FormValue("name")
+	query := Config{
+		"project": "",
+		"zone":    "",
+		"name":    "",
+	}
+	r.ParseForm()
+	ctx := query.Read(r.Form).WithContext(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
-	op, err := service.Instances.Delete(project, zone, name).Do()
+	op, err := service.Instances.Delete(query["project"], query["zone"], query["name"]).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	go checkInstance(project, zone, name)
+	// TODO delete cname
+	// TODO delete static address
+	go checkInstance(ctx, cancel, nil)
 
 	writeRes(w, op)
 }
 
 func broadcast(w http.ResponseWriter, r *http.Request) {
 
-	hub, exists := GetWSHub()
-	if !exists {
+	hub := getWSHub()
+	if hub == nil {
 		http.Error(w, "wshub not found", 500)
 		return
 	}
@@ -425,15 +456,22 @@ func broadcast(w http.ResponseWriter, r *http.Request) {
 	hub.Broadcast(status)
 }
 
-func checkInstance(project, zone, name string) {
+func checkInstance(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
+
+	project, _ := ctx.Value("project").(string)
+	zone, _ := ctx.Value("zone").(string)
+	name, _ := ctx.Value("name").(string)
 
 	defer log.Println("quit check instance")
-	service, exists := GetComputeService()
-	if !exists {
+
+	service := getComputeService()
+	if service == nil {
+		cancel()
 		return
 	}
-	hub, exists := GetWSHub()
-	if !exists {
+	hub = getWSHub()
+	if hub == nil {
+		cancel()
 		return
 	}
 
@@ -444,6 +482,12 @@ func checkInstance(project, zone, name string) {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			log.Println(ctx.Err())
+			return
+		default:
+		}
 		time.Sleep(time.Second)
 		inst, err := service.Instances.Get(project, zone, name).Do()
 		if googleapi.IsNotModified(err) {
@@ -460,6 +504,7 @@ func checkInstance(project, zone, name string) {
 					"error": err.Error(),
 				},
 			})
+			cancel()
 			return
 		}
 
@@ -472,6 +517,11 @@ func checkInstance(project, zone, name string) {
 		if inst.Status == "RUNNING" {
 			items["network-ip"] = inst.NetworkInterfaces[0].NetworkIP
 			items["nat-ip"] = inst.NetworkInterfaces[0].AccessConfigs[0].NatIP
+
+			if c != nil {
+				c <- context.WithValue(ctx, "ip", items["nat-ip"])
+			}
+
 			hub.Broadcast(ProcessStatus{
 				Active: active,
 				Items:  items,
@@ -480,4 +530,138 @@ func checkInstance(project, zone, name string) {
 		}
 	}
 
+}
+
+func getAddress(w http.ResponseWriter, r *http.Request) {
+
+	service := getComputeService()
+	if service == nil {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	query := Config{
+		"project": env.ProjectID,
+		"region":  env.Region,
+		"address": "",
+	}
+	query.Read(r.URL.Query())
+
+	res, err := service.Addresses.Get(query["project"], query["region"], query["address"]).Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, res)
+}
+
+func insertAddress(w http.ResponseWriter, r *http.Request) {
+
+	service := getComputeService()
+	if service == nil {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	query := Config{
+		"project":      env.ProjectID,
+		"region":       env.Region,
+		"ip":           "",
+		"address_name": "",
+	}
+	r.ParseForm()
+	ctx := query.Read(r.Form).WithContext(context.Background())
+	ctx = context.WithValue(ctx, "service", service)
+	ctx, cancel := context.WithCancel(ctx)
+	c := make(chan context.Context, 1)
+
+	go makeStaticIP(ctx, cancel, c)
+	select {
+	case <-ctx.Done():
+		http.Error(w, ctx.Err().Error(), 500)
+	case ctx := <-c:
+		res, _ := ctx.Value("operation").(*compute.Operation)
+		writeRes(w, res)
+	}
+
+}
+
+func makeStaticIP(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
+
+	select {
+	case <-ctx.Done():
+		log.Println(ctx.Err())
+
+	case ctx := <-c:
+		service, ok := ctx.Value("service").(*compute.Service)
+		if !ok {
+			cancel()
+			return
+		}
+		project, _ := ctx.Value("project").(string)
+		region, _ := ctx.Value("region").(string)
+		ip, _ := ctx.Value("ip").(string)
+		name, _ := ctx.Value("address_name").(string)
+		res, err := service.Addresses.Insert(project, region, &compute.Address{
+			Address: ip,
+			Name:    name,
+		}).Do()
+
+		if err != nil {
+			log.Println(err)
+			cancel()
+			return
+		}
+
+		c <- context.WithValue(ctx, "operation", res)
+	}
+
+}
+
+func insertDNSCName(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
+
+	client := getClient()
+	if client == nil {
+		cancel()
+		log.Println("not found client")
+		return
+	}
+
+	service, err := dns.New(client)
+	if err != nil {
+		log.Println(err)
+		cancel()
+		return
+	}
+
+	name, _ := ctx.Value("name").(string)
+	ip, _ := ctx.Value("ip").(string)
+	fullDomain := name + "." + env.DomainName
+	project, _ := ctx.Value("project").(string)
+	manageZone := env.DNSManageZoneName
+	change := &dns.Change{
+		Additions: []*dns.ResourceRecordSet{
+			{
+				Kind: "dns#resourceRecordSet",
+				Name: fullDomain,
+				Rrdatas: []string{
+					ip,
+				},
+				Type: "CNAME",
+				Ttl:  300,
+			},
+		},
+	}
+
+	res, err := service.Changes.Create(project, manageZone, change).Do()
+
+	log.Println(res)
+	log.Println(err)
+}
+
+func zone2region(zone string) string {
+	s := strings.Split(zone, "-")
+	s = s[:len(s)-1]
+	return strings.Join(s, "-")
 }

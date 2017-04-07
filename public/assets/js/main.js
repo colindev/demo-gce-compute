@@ -82,6 +82,7 @@ function connWS(url, handler) {
 
 var conf = new Metadata('config', {
         name: "",
+        subdomain: "",
         image: "centos-7-v20170227",
         cpu: "1",
         memory: "1024",
@@ -103,7 +104,6 @@ yum update -y
 `}), 
     page = (new Paging([
         {path:"/", name: "虛擬機規格"}, 
-        // {path:"/machine_type.html", name: "虛擬機規格"}, 
         {path:"/startup_script.html", name:"啟動腳本"},
         {path:"/create.html", name:"虛擬機狀態"}])).bind('button.paging-prev', 'button.paging-next');
 
@@ -191,7 +191,9 @@ $('#detail-name').text(conf.get('name'));
 $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], function(e){
 
     var $me = $(this),
-        data = JSON.parse(localStorage.getItem('config'));
+        data = conf.obj();
+    
+    data['subdomain'] = data['name'];
 
     $('#detail-network-ip').text('')
     $('#detail-nat-ip').text('')
