@@ -166,21 +166,27 @@ function onmessage(e){
     var status = JSON.parse(e.data);
     console.log(status)
 
-    if (`compute#instance#${conf.get('name')}` != status.active) {
-        return
+    if (`compute#instance#${conf.get('name')}` == status.active) {
+        $processBar.attr('status', status.items.status);
+        processBox.innerText += '\n'+e.data;
+        processBox.scrollTop = processBox.scrollHeight;
+        if (status.items["status"]) {
+            $('#detail-status').text(status.items["status"]);
+        }
+        if (status.items['network-ip']) {
+            $('#detail-network-ip').text(status.items['network-ip']);
+        }
+        if (status.items['nat-ip']) {
+            $('#detail-nat-ip').text(status.items['nat-ip']);
+        }
     }
 
-    $processBar.attr('status', status.items.status);
-    processBox.innerText += '\n'+e.data;
-    processBox.scrollTop = processBox.scrollHeight;
-    if (status.items["status"]) {
-        $('#detail-status').text(status.items["status"]);
+    if (`address#static#${conf.get('name')}` == status.active) {
+        console.log('set ip static')
     }
-    if (status.items['network-ip']) {
-        $('#detail-network-ip').text(status.items['network-ip']);
-    }
-    if (status.items['nat-ip']) {
-        $('#detail-nat-ip').text(status.items['nat-ip']);
+
+    if (`dns#record#${conf.get('name')}` == status.active) {
+        $('#detail-domain > a').attr('href', status.items['domain']).attr('target', '_brank').text(status.items['domain']);
     }
 
 };

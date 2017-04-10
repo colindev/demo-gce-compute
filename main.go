@@ -640,21 +640,36 @@ func makeStaticIP(ctx context.Context, cancel context.CancelFunc, c chan context
 		project, _ := ctx.Value("project").(string)
 		region, _ := ctx.Value("region").(string)
 		ip, _ := ctx.Value("ip").(string)
-		name, _ := ctx.Value("address_name").(string)
-		log.Printf("[makeStaticIP] project=%s | region=%s | ip=%s | name=%s \n", project, region, ip, name)
+		addressName, _ := ctx.Value("address_name").(string)
+		name, _ := ctx.Value("name").(string)
+		log.Printf("[makeStaticIP] project=%s | region=%s | ip=%s | addressName=%s \n", project, region, ip, addressName)
 		res, err := service.Addresses.Insert(project, region, &compute.Address{
 			Address: ip,
-			Name:    name,
+			Name:    addressName,
 		}).Do()
+
+		active := "address#static#" + name
+		items := Items{
+			"project": project,
+			"ip":      ip,
+		}
+		defer func() {
+			hub.Broadcast(ProcessStatus{
+				Active: active,
+				Items:  items,
+			})
+		}()
 
 		if err != nil {
 			log.Println(err)
 			cancel()
+			items["err"] = err.Error()
 			return
 		}
 
 		log.Printf("[makeStaticIP] res=%+v \n", res)
 		c <- context.WithValue(ctx, "operation", res)
+		items["success"] = "ok"
 	}
 
 }
@@ -723,14 +738,14 @@ func insertDNSRecord(ctx context.Context, cancel context.CancelFunc, c chan cont
 
 		name, _ := ctx.Value("name").(string)
 		ip, _ := ctx.Value("ip").(string)
-		fullDomain := name + "." + env.DomainName + "."
+		fullDomain := name + "." + env.DomainName
 		project, _ := ctx.Value("project").(string)
 		manageZone := env.DNSManageZoneName
 		change := &dns.Change{
 			Additions: []*dns.ResourceRecordSet{
 				{
 					Kind: "dns#resourceRecordSet",
-					Name: fullDomain,
+					Name: fullDomain + ".",
 					Rrdatas: []string{
 						ip,
 					},
@@ -742,9 +757,27 @@ func insertDNSRecord(ctx context.Context, cancel context.CancelFunc, c chan cont
 
 		log.Printf("[insertDNS] change=%+v\n", change)
 
+		active := "dns#record#" + name
+		items := Items{
+			"project": project,
+			"domain":  fullDomain,
+		}
+		defer func() {
+			hub.Broadcast(ProcessStatus{
+				Active: active,
+				Items:  items,
+			})
+		}()
+
 		res, err := service.Changes.Create(project, manageZone, change).Do()
 
+		if err != nil {
+			items["error"] = err.Error()
+			return
+		}
+
 		log.Printf("[insertDNS] %+v\n", res)
+		items["success"] = "ok"
 	}
 }
 
@@ -777,13 +810,13 @@ func deleteDNSRecord(ctx context.Context, cancel context.CancelFunc, c chan cont
 		project, _ := ctx.Value("project").(string)
 		name, _ := ctx.Value("name").(string)
 		ip, _ := ctx.Value("ip").(string)
-		fullDomain := name + "." + env.DomainName + "."
+		fullDomain := name + "." + env.DomainName
 		manageZone := env.DNSManageZoneName
 		change := &dns.Change{
 			Deletions: []*dns.ResourceRecordSet{
 				{
 					Kind: "dns#resourceRecordSet",
-					Name: fullDomain,
+					Name: fullDomain + ".",
 					Rrdatas: []string{
 						ip,
 					},

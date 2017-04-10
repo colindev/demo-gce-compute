@@ -6,6 +6,7 @@
         <li>記憶體:<span id="detail-memory"></span></li>
         <li>內網IP:<span id="detail-network-ip"></span></li>
         <li>外網IP:<span id="detail-nat-ip"></span></li>
+        <li>網址:<span id="detail-domain"><a></a></span></li>
     </ul>
 </div>
 
