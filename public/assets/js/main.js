@@ -99,7 +99,9 @@ var conf = new Metadata('config', {
 # - xxx_callback [current=1] [total=10] [msg='']
 
 yum update -y
+yum install nginx -y
 
+systemctl restart nginx
 
 `}), 
     page = (new Paging([

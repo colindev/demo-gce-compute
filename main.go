@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -304,9 +305,8 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	ctx := query.Read(r.Form).WithContext(context.Background())
 	ctx, cancel := context.WithCancel(ctx)
-	ctx = context.WithValue(ctx, "service", service)
 	ctx = context.WithValue(ctx, "region", zone2region(query["zone"]))
-	ctx = context.WithValue(ctx, "address_name", query["subdomain"]+"-"+strings.Replace(env.DomainName, ".", "-", -1))
+	ctx = context.WithValue(ctx, "address_name", makeAddressName(query["subdomain"]))
 
 	machineType := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/machineTypes/custom-%s-%s",
 		query["project"],
@@ -390,16 +390,10 @@ func insertComputeInstance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := make(chan context.Context, 1)
-	go checkInstance(ctx, cancel, c)
 	go func() {
-		select {
-		case <-ctx.Done():
-			log.Println(ctx.Err())
-			return
-		case ctx := <-c:
-			makeStaticIP(ctx, cancel, c)
-			insertDNSCName(ctx, cancel, c)
-		}
+		checkInstance(ctx, cancel, c)
+		makeStaticIP(ctx, cancel, c)
+		insertDNSRecord(ctx, cancel, c)
 	}()
 
 	writeRes(w, op)
@@ -422,6 +416,15 @@ func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	ctx := query.Read(r.Form).WithContext(context.Background())
 	ctx, cancel := context.WithCancel(ctx)
+	ctx = context.WithValue(ctx, "region", zone2region(query["zone"]))
+	// 目前直接用name
+	ctx = context.WithValue(ctx, "address_name", makeAddressName(query["name"]))
+	inst, err := getInstance(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	ctx = context.WithValue(ctx, "ip", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 
 	op, err := service.Instances.Delete(query["project"], query["zone"], query["name"]).Do()
 	if err != nil {
@@ -429,10 +432,17 @@ func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO delete cname
-	// TODO delete static address
-	go checkInstance(ctx, cancel, nil)
+	go func() {
+		// checkInstance 在刪除程序中是結束在 404, 所以不能用真正的context.CancelFunc
+		// 因為並沒有要中斷之後的程序
+		checkInstance(ctx, func() {
+			c := make(chan context.Context, 1)
+			c <- ctx
+			dropStaticIP(ctx, cancel, c)
+			deleteDNSRecord(ctx, cancel, c)
+		}, nil)
 
+	}()
 	writeRes(w, op)
 }
 
@@ -489,7 +499,7 @@ func checkInstance(ctx context.Context, cancel context.CancelFunc, c chan contex
 		default:
 		}
 		time.Sleep(time.Second)
-		inst, err := service.Instances.Get(project, zone, name).Do()
+		inst, err := getInstance(ctx)
 		if googleapi.IsNotModified(err) {
 			hub.Broadcast(ProcessStatus{
 				Active: active,
@@ -530,6 +540,24 @@ func checkInstance(ctx context.Context, cancel context.CancelFunc, c chan contex
 		}
 	}
 
+}
+
+func getInstance(ctx context.Context) (*compute.Instance, error) {
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	service := getComputeService()
+	if service == nil {
+		return nil, errors.New("compute service not found")
+	}
+	project, _ := ctx.Value("project").(string)
+	zone, _ := ctx.Value("zone").(string)
+	name, _ := ctx.Value("name").(string)
+	return service.Instances.Get(project, zone, name).Do()
 }
 
 func getAddress(w http.ResponseWriter, r *http.Request) {
@@ -589,20 +617,31 @@ func insertAddress(w http.ResponseWriter, r *http.Request) {
 
 func makeStaticIP(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
 
+	log.Println("[makeStaticIP] start")
 	select {
 	case <-ctx.Done():
-		log.Println(ctx.Err())
+		log.Println("[makeStaticIP]", ctx.Err())
 
 	case ctx := <-c:
-		service, ok := ctx.Value("service").(*compute.Service)
-		if !ok {
+		client := getClient()
+		if client == nil {
+			log.Println("[dropStaticIP] getClient() return nil")
 			cancel()
 			return
 		}
+
+		service, err := compute.New(client)
+		if err != nil {
+			log.Println("[makeStaticIP]", err)
+			cancel()
+			return
+		}
+
 		project, _ := ctx.Value("project").(string)
 		region, _ := ctx.Value("region").(string)
 		ip, _ := ctx.Value("ip").(string)
 		name, _ := ctx.Value("address_name").(string)
+		log.Printf("[makeStaticIP] project=%s | region=%s | ip=%s | name=%s \n", project, region, ip, name)
 		res, err := service.Addresses.Insert(project, region, &compute.Address{
 			Address: ip,
 			Name:    name,
@@ -614,54 +653,157 @@ func makeStaticIP(ctx context.Context, cancel context.CancelFunc, c chan context
 			return
 		}
 
+		log.Printf("[makeStaticIP] res=%+v \n", res)
 		c <- context.WithValue(ctx, "operation", res)
 	}
 
 }
 
-func insertDNSCName(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
+func dropStaticIP(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
 
-	client := getClient()
-	if client == nil {
-		cancel()
-		log.Println("not found client")
-		return
+	log.Println("[dropStaticIP] start")
+	select {
+	case <-ctx.Done():
+		log.Println("[dropStaticIP]", ctx.Err())
+	case ctx := <-c:
+
+		client := getClient()
+		if client == nil {
+			log.Println("[dropStaticIP] getClient() return nil")
+			cancel()
+			return
+		}
+		service, err := compute.New(client)
+		if err != nil {
+			log.Println("[dropStaticIP]", err)
+			cancel()
+			return
+		}
+		project, _ := ctx.Value("project").(string)
+		region, _ := ctx.Value("region").(string)
+		name, _ := ctx.Value("address_name").(string)
+		log.Printf("[makeStaticIP] project=%s | region=%s | name=%s \n", project, region, name)
+		res, err := service.Addresses.Delete(project, region, name).Do()
+		if err != nil {
+			log.Println(err)
+			cancel()
+			return
+		}
+
+		log.Printf("[makeStaticIP] res=%+v \n", res)
+		c <- context.WithValue(ctx, "operation", res)
 	}
+}
 
-	service, err := dns.New(client)
-	if err != nil {
-		log.Println(err)
-		cancel()
+func insertDNSRecord(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
+
+	log.Println("[insertDNS] start")
+	select {
+	case <-ctx.Done():
+		log.Println(ctx.Err())
 		return
-	}
 
-	name, _ := ctx.Value("name").(string)
-	ip, _ := ctx.Value("ip").(string)
-	fullDomain := name + "." + env.DomainName
-	project, _ := ctx.Value("project").(string)
-	manageZone := env.DNSManageZoneName
-	change := &dns.Change{
-		Additions: []*dns.ResourceRecordSet{
-			{
-				Kind: "dns#resourceRecordSet",
-				Name: fullDomain,
-				Rrdatas: []string{
-					ip,
+	case ctx := <-c:
+
+		var err error
+		defer func() { log.Println("[insertDNS] err=", err) }()
+		client := getClient()
+		if client == nil {
+			cancel()
+			log.Println("not found client")
+			return
+		}
+
+		service, err := dns.New(client)
+		if err != nil {
+			log.Println(err)
+			cancel()
+			return
+		}
+
+		name, _ := ctx.Value("name").(string)
+		ip, _ := ctx.Value("ip").(string)
+		fullDomain := name + "." + env.DomainName + "."
+		project, _ := ctx.Value("project").(string)
+		manageZone := env.DNSManageZoneName
+		change := &dns.Change{
+			Additions: []*dns.ResourceRecordSet{
+				{
+					Kind: "dns#resourceRecordSet",
+					Name: fullDomain,
+					Rrdatas: []string{
+						ip,
+					},
+					Type: "A",
+					Ttl:  1,
 				},
-				Type: "CNAME",
-				Ttl:  300,
 			},
-		},
+		}
+
+		log.Printf("[insertDNS] change=%+v\n", change)
+
+		res, err := service.Changes.Create(project, manageZone, change).Do()
+
+		log.Printf("[insertDNS] %+v\n", res)
 	}
+}
 
-	res, err := service.Changes.Create(project, manageZone, change).Do()
+func deleteDNSRecord(ctx context.Context, cancel context.CancelFunc, c chan context.Context) {
 
-	log.Println(res)
-	log.Println(err)
+	log.Println("[deleteDNSRecord] start")
+	select {
+	case <-ctx.Done():
+		log.Println("[deleteDNSRecord]", ctx.Err())
+		return
+
+	case ctx := <-c:
+
+		var err error
+		defer func() { log.Println("[deleteDNSRecord] err=", err) }()
+		client := getClient()
+		if client == nil {
+			cancel()
+			log.Println("not found client")
+			return
+		}
+
+		service, err := dns.New(client)
+		if err != nil {
+			log.Println(err)
+			cancel()
+			return
+		}
+
+		project, _ := ctx.Value("project").(string)
+		name, _ := ctx.Value("name").(string)
+		ip, _ := ctx.Value("ip").(string)
+		fullDomain := name + "." + env.DomainName + "."
+		manageZone := env.DNSManageZoneName
+		change := &dns.Change{
+			Deletions: []*dns.ResourceRecordSet{
+				{
+					Kind: "dns#resourceRecordSet",
+					Name: fullDomain,
+					Rrdatas: []string{
+						ip,
+					},
+					Type: "A",
+					Ttl:  1,
+				},
+			},
+		}
+		res, err := service.Changes.Create(project, manageZone, change).Do()
+
+		log.Printf("[deleteDNSRecord] %+v\n", res)
+	}
 }
 
 func zone2region(zone string) string {
 	s := strings.Split(zone, "-")
 	s = s[:len(s)-1]
 	return strings.Join(s, "-")
+}
+
+func makeAddressName(name string) string {
+	return name + "-" + strings.Replace(env.DomainName, ".", "-", -1)
 }
