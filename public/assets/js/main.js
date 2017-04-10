@@ -236,6 +236,7 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
                                     <li class="status">Status<span></span></li>
                                     <li class="ip">Nat IP<span></span></li>
                                     <li class="network_ip">network IP<span></span></li>
+                                    <li class="domain"><a target="_brank"></a></li>
                                 </ul>
                             </div>
                         `);
@@ -298,11 +299,14 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
     }
 
     function insert(item) {
-        var $item = $tmpInstance.clone();
+        var $item = $tmpInstance.clone(),
+            // TODO 暫時偷懶作法
+            domain = location.host.replace(/^www/, item.name);
         $item.attr("ref", item.name);
         $item.data('item', item);
         $item.find('h3').text(item.name);
         $item.find('.status > span').text(item.status);
+        $item.find('.domain > a').attr('href', 'http://'+domain).text(domain)
         $instances.append($item)
         displayIP($item, item);
         collection[item.name] = $item;
