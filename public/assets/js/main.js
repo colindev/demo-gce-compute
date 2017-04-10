@@ -186,7 +186,7 @@ function onmessage(e){
     }
 
     if (`dns#record#${conf.get('name')}` == status.active) {
-        $('#detail-domain > a').attr('href', status.items['domain']).attr('target', '_brank').text(status.items['domain']);
+        $('#detail-domain > a').attr('href', "http://"+status.items['domain']).attr('target', '_brank').text(status.items['domain']);
     }
 
 };
