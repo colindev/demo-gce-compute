@@ -62,11 +62,14 @@ $.fn.confirmButton = function(arr, handler){
     var $me = this, ind = 0;
 
     return this.text(arr[ind]).on('click', function(e){
+        var ret;
         ind++; 
         if (ind >= arr.length) {
-            return handler.call(this, e);
-        } 
+            ret = handler.call(this, e);
+            ind = 0;
+        }
         $me.text(arr[ind]);
+        return ret;
     });
 };
 
@@ -147,6 +150,10 @@ page.on(['/', '/index.html'], function(){
     }).change();
 
 }).on('/startup_script.html', function(){
+
+    $('#config-revert').confirmButton(["還原預設腳本","此動作會遺失所有修改,繼續?"], function(e){
+        $('#startup-script').val(conf.getDefault('startup_script')).change();
+    });
 
     $('#startup-script').val(conf.get("startup_script")).on('change', function(e){
         conf.set("startup_script", this.value).store();

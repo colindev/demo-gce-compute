@@ -5,6 +5,7 @@
 function Metadata(key, o) {
 
     this.key = key
+    this._default = o || {};
     try {
         x = JSON.parse(localStorage.getItem(this.key));
         for (var n in o) {
@@ -21,6 +22,7 @@ function Metadata(key, o) {
 }
 Metadata.prototype = {
     _o: {}, 
+    _default: {},
     set: function(name, value){
         this._o[name] = value;
         return this;
@@ -38,6 +40,9 @@ Metadata.prototype = {
 
         return this;
     },
+    getDefault: function(name){
+        return this._default[name];
+    }
 };
 
 return Metadata;

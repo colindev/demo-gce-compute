@@ -6,6 +6,7 @@
 </div>
 
 <div class="row">
+    <button id="config-revert" class="btn btn-sm btn-default">恢復預設腳本</button>
     <textarea id="startup-script"></textarea>
 </div>
 
