@@ -23,8 +23,7 @@ deploy:
 						./templates \
 						./scripts \
 						./$(APP).`cat ./VERSION` $$DIST;\
-			ssh $${DIST%:*} 'cd ~/$${DIST#*:} && sudo make upgrade'; \
-			ssh $${DIST%:*} 'cd ~/$${DIST#*:} && ls -l ./';\
+			ssh $${DIST%:*} "cd $${DIST#*:} && sudo make upgrade && ls -l"; \
 		fi
 
 start:
