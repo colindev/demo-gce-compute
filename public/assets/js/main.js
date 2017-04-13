@@ -179,6 +179,10 @@ function onmessage(e){
         processBox.scrollTop = processBox.scrollHeight;
         if (status.items["status"]) {
             $('#detail-status').text(status.items["status"]);
+
+            if (status.items["status"] == "DONE") {
+                $('#btn-create').unlock();            
+            }
         }
         if (status.items['network-ip']) {
             $('#detail-network-ip').text(status.items['network-ip']);
