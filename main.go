@@ -168,6 +168,8 @@ func main() {
 	http.Handle("/ws", hub.Handler())
 	http.HandleFunc("/ws-broadcast", broadcast)
 	// admin apis
+	http.HandleFunc("/admin/api/project", getProject)
+	http.HandleFunc("/admin/api/region", getRegion)
 	http.HandleFunc("/admin/api/compute/zones", listZones)
 	http.HandleFunc("/admin/api/compute/images", listImages)
 	http.HandleFunc("/admin/api/compute/instances", listComputeInstances)
@@ -227,6 +229,51 @@ func listImages(w http.ResponseWriter, r *http.Request) {
 	query.Read(r.URL.Query())
 
 	res, err := service.Images.List(query["project"]).Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, res)
+}
+
+func getProject(w http.ResponseWriter, r *http.Request) {
+
+	service := getComputeService()
+	if service == nil {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	query := Config{
+		"project": env.ProjectID,
+	}
+	query.Read(r.URL.Query())
+
+	res, err := service.Projects.Get(query["project"]).Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, res)
+}
+
+func getRegion(w http.ResponseWriter, r *http.Request) {
+
+	service := getComputeService()
+	if service == nil {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	query := Config{
+		"project": env.ProjectID,
+		"region":  env.Region,
+	}
+	query.Read(r.URL.Query())
+
+	res, err := service.Regions.Get(query["project"], query["region"]).Do()
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return

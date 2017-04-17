@@ -116,7 +116,7 @@ $(document).ajaxError(function(e, xhr, sets, err){
     alert(xhr.responseText)
 });
 
-page.on(['/', '/index.html'], function(){
+page.on(['/', '/index', '/index.html'], function(){
 
     var $cpu = $('#cpu'),
         $memory = $('#memory').on('change', function(){
@@ -149,7 +149,7 @@ page.on(['/', '/index.html'], function(){
 
     }).change();
 
-}).on('/startup_script.html', function(){
+}).on(['/startup_script', '/startup_script.html'], function(){
 
     $('#config-revert').confirmButton(["還原預設腳本","此動作會遺失所有修改,繼續?"], function(e){
         $('#startup-script').val(conf.getDefault('startup_script')).change();
@@ -163,7 +163,7 @@ page.on(['/', '/index.html'], function(){
         conf.set('name', this.value).store();
     }).val(conf.get('name'));
 
-}).on('/create.html', function(){
+}).on(['/create', '/create.html'], function(){
 
 var processBox = document.getElementById('process-status'),
     $processBar = $('#process');
@@ -232,7 +232,92 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
 
 });
 
-}).on('/instances.html', function(o){
+}).on(['/resources_quotas', '/resources_quotas.html'], function(o){
+
+    var $projectSelect = $('#sel-projects'),
+        $regionSelect = $('#sel-regions'),
+        $box = $('#projects'),
+        $ul = $('<ul>'),
+        $temp = $('<li>'),
+        quotasMap = {
+            SNAPSHOTS: '快照',
+            NETWORKS: '網路',
+            FIREWALLS: '防火牆',
+            FORWARDING_RULES: '防火牆規則',
+            IMAGES: '映像檔',
+            STATIC_ADDRESSES: '靜態IP',
+            ROUTES: '路由器',
+            TARGET_POOLS: '目標集區',
+            HEALTH_CHECKS: '健康狀態檢查',
+            IN_USE_ADDRESSES: '使用中 IP位址 通用',
+            TARGET_INSTANCES: '目標執行實體',
+            TARGET_HTTP_PROXIES: '目標 HTTP Proxy 伺服器',
+            URL_MAPS: '網址對應數目',
+            BACKEND_SERVICES: '後端服務',
+            INSTANCE_TEMPLATES: '執行個體範本',
+            VPN_TUNNELS: '目標 VPN 閘道',
+            BACKEND_BUCKETS: '後端 Bucket',
+            ROUTERS: '路由器',
+            TARGET_SSL_PROXIES: '目標 SSL Proxy',
+            TARGET_HTTPS_PROXIES: '目標 HTTPS Proxy 伺服器數',
+            SSL_CERTIFICATES: 'SSL 憑證數',
+            SUBNETWORKS: '子網路',
+
+            CUPS: 'CPUs',
+            DISKS_TOTAL_GB: '永久磁碟的總保留容量 (GB)',
+            SSD_TOTAL_GB: 'SSD 磁碟的總保留空間 (GB)',
+            LOCAL_SSD_TOTAL_GB: '本機 SSD 磁碟的總保留空間 (GB)',
+            INSTANCE_GROUPS: '執行個體群組',
+            INSTANCE_GROUP_MANAGERS: '受管理的執行個體群組',
+            INSTANCES: '執行個體數',
+            AUTOSCALERS: '自動配置器',
+            REGIONAL_AUTOSCALERS: '區域自動配置器',
+            REGIONAL_INSTANCE_GROUP_MANAGERS: '受管理的執行個體群組'
+        };
+
+    $projectSelect.on('change', fetchData).change();
+    $regionSelect.on('change', fetchData);
+
+
+    function fetchData(e) {
+        if (this.id == 'sel-regions' && this.value) {
+            fetchRegion(e)
+            return
+        }
+
+        fetchProject(e)
+    }
+
+    function fetchProject(e) {
+        $.get(`/admin/api/project`, {project:$projectSelect.val()}).done(function(json, stateText, $xhr){
+            
+            $ul.remove().empty();
+            insertQuotas(json && json.quotas || []);
+            $ul.appendTo($box);
+
+        });
+    }
+    function fetchRegion(e) {
+        $.get(`/admin/api/region`, {project:$projectSelect.val(), region:$regionSelect.val()}).done(function(json, stateText, $xhr){
+
+            $ul.remove().empty();
+            insertQuotas(json && json.quotas || []);
+            $ul.appendTo($box);
+            
+        });
+    }
+
+    function insertQuotas(arr) {
+
+        console.log(arr)
+        $(arr).each(function(i, item){
+            var $item = $temp.clone();
+            $item.html((quotasMap[item.metric] || item.metric) + `: <b>${item.usage||0}/${item.limit}</b>`).appendTo($ul);
+        });
+    
+    }
+
+}).on(['/instances', '/instances.html'], function(o){
 
     o.name = "虛擬機列表"
 

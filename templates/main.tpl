@@ -25,8 +25,9 @@
                 </div>
                 <div id="navbar" class="navbar-collapse collapse">
                     <ul class="nav navbar-nav navbar-right">
-                        <li><a href="/instances.html">虛擬機列表</a></li>
+                        <li><a href="/instances">虛擬機列表</a></li>
                         <li><a href="/">新增虛擬機</a></li>
+                        <li><a href="/resources_quotas">資源配額</a></li>
                     </ul>
                 </div>
             </div>
