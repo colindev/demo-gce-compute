@@ -4,7 +4,7 @@
         <option>gcetest-156204</option>
     </select>
     <select id="sel-regions">
-        <option value="">default</option>
+        <option value="">global</option>
         <option>asia-east1</option>
     </select>
 </div>
