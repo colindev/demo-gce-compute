@@ -263,7 +263,7 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
             SSL_CERTIFICATES: 'SSL 憑證數',
             SUBNETWORKS: '子網路',
 
-            CUPS: 'CPUs',
+            CPUS: 'CPUs',
             DISKS_TOTAL_GB: '永久磁碟的總保留容量 (GB)',
             SSD_TOTAL_GB: 'SSD 磁碟的總保留空間 (GB)',
             LOCAL_SSD_TOTAL_GB: '本機 SSD 磁碟的總保留空間 (GB)',
