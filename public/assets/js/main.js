@@ -313,6 +313,9 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
         $(arr).each(function(i, item){
             var $item = $temp.clone();
             $item.html((quotasMap[item.metric] || item.metric) + `: <b>${item.usage||0}/${item.limit}</b>`).appendTo($ul);
+            
+            // 視覺化用量
+            $(`<div class="usage"><div style="width:${(item.usage||0)/item.limit*100}%"></div></div>`).appendTo($item);
         });
     
     }

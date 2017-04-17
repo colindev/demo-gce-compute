@@ -75,6 +75,17 @@ textarea#startup-script {
     width: 100%;
 }
 
+.usage {
+    position: relative;
+    width: 300px;
+    height: 5px;
+    background-color: rgba(190,190,190,1);
+}
+.usage div{
+    height: 100%;
+    background-color: rgba(77,175,77,1);
+}
+
 /* bootstrap */
 .row {
     margin-top: 10px;
