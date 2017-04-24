@@ -1,3 +1,10 @@
+/*
+TODO 加入router
+TODO 加入middleware
+TODO 改用反射建構 default client
+TODO 改用反射建構 service
+*/
+
 package main
 
 import (
