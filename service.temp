@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User={USER}
 
-ExecStart={PWD}/seed -addr :80
+ExecStart={PWD}/seed
 ExecStop=/bin/kill -s QUIT $MAINPID
 
 Restart=always

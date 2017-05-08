@@ -24,7 +24,9 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 
+	"github.com/colindev/osenv"
 	"github.com/colindev/wshub"
+	"github.com/joho/godotenv"
 
 	compute "google.golang.org/api/compute/v1"
 	dns "google.golang.org/api/dns/v1"
@@ -35,31 +37,33 @@ import (
 
 type key int
 
+type Env struct {
+	ctx       context.Context
+	SeedName  string `env:"SeedName"`
+	Addr      string `env:"Addr"`
+	ProjectID string `env:"ProjectID"`
+	Region    string `env:"Region"`
+	Zone      string `env:"Zone"`
+
+	DomainName        string `env:"DomainName"`
+	DNSManageZoneName string `env:"DNSManageZoneName"`
+
+	OSFamily  string `env:"OSFamily"`
+	OSProject string `env:"OSProject"`
+	OSVersion string `env:"OSVersion"`
+
+	BasePath       string `env:"-"`
+	SelfInternalIP string `env:"-"`
+}
+
 var (
 	client         *http.Client
 	computeService *compute.Service
 	hub            *wshub.Hub
-	env            = struct {
-		ctx       context.Context
-		Addr      string
-		ProjectID string
-		Region    string
-		Zone      string
-
-		DomainName        string
-		DNSManageZoneName string
-
-		OSFamily  string
-		OSProject string
-		OSVersion string
-
-		BasePath       string
-		SelfInternalIP string
-	}{
-		ctx:       context.Background(),
-		ProjectID: "gcetest-156204",
-		Region:    "asia-east1",
-		Zone:      "asia-east1-a",
+	env            = Env{
+		ctx:    context.Background(),
+		Region: "asia-east1",
+		Zone:   "asia-east1-a",
 
 		DomainName:        "jan23.me",
 		DNSManageZoneName: "test-jan23-me",
@@ -118,7 +122,19 @@ func init() {
 	}
 
 	env.BasePath = basePath
-	flag.StringVar(&env.Addr, "addr", ":80", "http address")
+
+	var envFile = env.BasePath + "/.env"
+
+	if err := godotenv.Load(envFile); err != nil {
+		log.Fatal(err, "Please copy .env.sample to .env")
+	}
+
+	if err := osenv.LoadTo(&env); err != nil {
+		log.Fatal(err)
+	}
+
+	// overwrite
+	flag.StringVar(&env.Addr, "addr", env.Addr, "http address")
 
 	client, err = google.DefaultClient(env.ctx, compute.ComputeScope, dns.NdevClouddnsReadwriteScope)
 	if err != nil {
@@ -138,6 +154,8 @@ func main() {
 
 	flag.Parse()
 	log.Printf("%+v", env)
+
+	// read projects
 
 	// views
 	fsServer := http.FileServer(http.Dir(env.BasePath + "/public"))
@@ -166,7 +184,7 @@ func main() {
 			name = "index"
 		}
 		if tpl, ok := tpls[name]; ok {
-			tpl.Execute(w, nil)
+			tpl.Execute(w, env)
 			return
 		}
 		fsServer.ServeHTTP(w, r)
@@ -185,6 +203,7 @@ func main() {
 	http.HandleFunc("/admin/api/compute/instances/delete", deleteConputeInstance)
 	http.HandleFunc("/admin/api/address", getAddress)
 	http.HandleFunc("/admin/api/addresses/insert", insertAddress)
+	http.HandleFunc("/admin/api/firewalls", listFirewalls)
 	// run server
 	log.Println(http.ListenAndServe(env.Addr, nil))
 }
@@ -479,6 +498,11 @@ func deleteConputeInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx = context.WithValue(ctx, "ip", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+
+	if query["name"] == env.SeedName {
+		http.Error(w, "這個是種子機,不可以刪", 500)
+		return
+	}
 
 	op, err := service.Instances.Delete(query["project"], query["zone"], query["name"]).Do()
 	if err != nil {
@@ -893,4 +917,28 @@ func zone2region(zone string) string {
 
 func makeAddressName(name string) string {
 	return name + "-" + strings.Replace(env.DomainName, ".", "-", -1)
+}
+
+func listFirewalls(w http.ResponseWriter, r *http.Request) {
+
+	service := getComputeService()
+	if service == nil {
+		http.Error(w, "compute service not found", 500)
+		return
+	}
+
+	query := Config{
+		"project": env.ProjectID,
+	}
+	r.ParseForm()
+	query.Read(r.Form)
+
+	res, err := service.Firewalls.List(query["project"]).Do()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	writeRes(w, res)
+
 }

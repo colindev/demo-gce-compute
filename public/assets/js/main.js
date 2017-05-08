@@ -442,7 +442,7 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
     $instances.on('click', 'button.btn-delete', function(e){
         var $this = $(this),
         item = $this.parent().data('item');
-        if (item.name == 'vm-test-1') {
+        if (item.name == 'demo') {
             alert('這個不能刪')
             return
         }
@@ -460,6 +460,24 @@ $('#btn-create').confirmButton(["建立","確定建立?","真的確定嗎?"], fu
             },
         });
     });
+
+}).on(["/firewalls", "/firewalls.html"], function(o){
+
+    o.name = "防火牆規則";
+
+    var $projectSelect = $('#sel-projects');
+
+
+    $projectSelect.on('change', fetchData).change();
+
+    function fetchData(e){
+        
+        $.get(`/admin/api/firewalls`, {project: $projectSelect.val()}, function(json, xhr, textStat){
+        
+            console.log(json)
+        
+        });
+    }
 
 }).listen();
 

@@ -1,7 +1,7 @@
 {{define "content"}}
 <div class="row">
     <select id="sel-projects">
-        <option>gcetest-156204</option>
+        <option>{{ .ProjectID }}</option>
     </select>
     <select id="sel-regions">
         <option value="">global</option>

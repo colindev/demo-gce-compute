@@ -16,6 +16,7 @@ deploy:
 	@read -r -p "> " DIST;\
 		if [ -n "$$DIST" ] ; then \
 			rsync -avP ./Makefile \
+						./.env.sample \
 						./service.temp \
 						./startup_script.*.temp \
 						./VERSION \
